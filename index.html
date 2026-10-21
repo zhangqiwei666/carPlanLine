@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能货运路线规划与实时偏航预警系统 Demo</title>
+  <!-- 引入 Turf.js 空间分析库 -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+  <!-- 引入高德开放平台官方原生 JS API v2.0 WebGL 矢量引擎 (已绑定用户 WebKey: 1b5afcd4182988278fda8e81237b07d9，集成官方实时路况插件) -->
+  <script src="https://webapi.amap.com/maps?v=2.0&key=1b5afcd4182988278fda8e81237b07d9&plugin=AMap.TruckDriving,AMap.Driving,AMap.Geocoder,AMap.Traffic"></script>
+  <link rel="stylesheet" href="./css/style.css?v=20261020_v12">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 顶部科技导航栏 -->
+    <header class="app-header">
+      <div class="header-left">
+        <button class="mobile-menu-toggle" id="btnToggleSidebar" title="展开/收起控制面板">
+          <span>☰</span> 菜单
+        </button>
+        <div class="logo-badge">TMS</div>
+        <h1>智能货运在途监控与实时偏航预警系统 <span>(移动端/真机自适应版)</span></h1>
+      </div>
+      <div class="header-right">
+        <!-- 核心视图模式切换: 手机司机导航 vs 调度中心大屏 -->
+        <div class="view-mode-tabs">
+          <button class="view-mode-btn active" id="btnModeDriver" title="手机端货车司机真实驾驶导航视图">
+            <span class="icon">📱</span> 手机司机导航
+          </button>
+          <button class="view-mode-btn" id="btnModeDispatch" title="企业调度中心监控与风控全景视图">
+            <span class="icon">🖥️</span> 调度管理大屏
+          </button>
+        </div>
+
+        <!-- 桌面端手机尺寸切换工具条 (只在电脑大屏司机模式下可见) -->
+        <div class="desktop-phone-frame-bar" id="desktopPhoneFrameBar">
+          <button class="frame-opt-btn active" id="btnFrameSim" title="居中显示真实 iPhone 比例手机屏幕">📱 手机尺寸(390×844)</button>
+          <button class="frame-opt-btn" id="btnFrameFull" title="将手机端视图铺满当前整个浏览器窗口">⛶ 铺满窗口</button>
+        </div>
+        <div class="mode-badge-wrap">
+          <span class="mode-tag sim" id="currentModeBadge">🎮 仿真推流模式</span>
+        </div>
+        <div class="system-status">
+          <span class="status-indicator online" id="netStatusDot"></span>
+          <span id="netStatusText">网络正常</span>
+        </div>
+        <div class="vehicle-badge">
+          <span>车辆: </span>
+          <strong id="headerPlate">粤B·8890A</strong>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主体工作区 -->
+    <main class="app-main">
+      <!-- 控制面板遮罩层 (手机端点击收起) -->
+      <div class="mobile-sidebar-backdrop" id="sidebarBackdrop"></div>
+
+      <!-- 左侧：调度规划与智能控制面板 -->
+      <aside class="control-panel" id="controlPanel">
+        <!-- 移动端侧边栏关闭按钮 -->
+        <div class="mobile-sidebar-close">
+          <span>⚙️ 调度控制面板</span>
+          <button id="btnCloseSidebar">✕ 关闭</button>
+        </div>
+
+        <!-- 核心模块 0: 手机真实物理 GPS 模式 (强力推荐实测) -->
+        <div class="panel-card real-gps-card">
+          <div class="card-title">
+            <span class="icon">📱</span>
+            <h3>手机真机实时定位模式</h3>
+            <span class="tag-live">真机实测</span>
+          </div>
+          <div class="real-gps-actions">
+            <button class="btn btn-gps-primary" id="btnRealGpsToggle">
+              <span class="btn-icon">🛰️</span>
+              <div class="btn-text">
+                <strong id="btnRealGpsText">开启手机真实 GPS 定位</strong>
+                <small id="btnRealGpsSub">读取手机芯片真实定位并实时上报</small>
+              </div>
+            </button>
+            <div class="gps-sub-actions">
+              <button class="btn btn-sub" id="btnPlanFromCurrentGps" title="自动根据手机当前位置生成 2.5km 测试走廊">
+                <span>🎯 以当前位置生成走廊</span>
+              </button>
+              <button class="btn btn-sub" id="btnCenterGps" title="将地图视角对齐到手机当前坐标">
+                <span>📍 居中跟随手机</span>
+              </button>
+              <button class="btn btn-sub" id="btnResetDemoRoute" title="切回广深演示路线">
+                <span>🛣️ 恢复广深演示路线</span>
+              </button>
+            </div>
+          </div>
+          <!-- 实时手机 GPS 遥测状态 -->
+          <div class="gps-telemetry-box" id="gpsTelemetryBox">
+            <div class="telemetry-row">
+              <span class="lbl">手机实时坐标:</span>
+              <span class="val" id="realGpsCoord">未连接 (等待开启)</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="lbl">硬件定位精度:</span>
+              <span class="val" id="realGpsAccuracy">--</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="lbl">累计定位更新:</span>
+              <span class="val" id="realGpsUpdateCount">0 次</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="lbl">自动居中跟随:</span>
+              <label class="switch-wrap">
+                <input type="checkbox" id="chkAutoFollow" checked />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 模块1: 货车物理参数与路线规划 (含高德 API 对接) -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">🚛</span>
+            <h3>货车规格与路径规划</h3>
+            <span class="tag-live" style="background:#10b981; color:#fff;">高德官方 API 已接入</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-item">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="margin-bottom:0;">起点 (地名/地址/经纬度):</label>
+                <button type="button" class="btn-chip" id="btnPickStartOnMap" title="点击后在地图上点击任意处选定起点">📍 地图选点</button>
+              </div>
+              <input type="text" id="startPointInput" value="广州黄埔港物流中心" placeholder="例: 深圳北站 / 武汉大学 / 114.05, 22.54" />
+            </div>
+            <div class="form-item">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="margin-bottom:0;">目的地 (地名/地址/经纬度):</label>
+                <button type="button" class="btn-chip" id="btnPickEndOnMap" title="点击后在地图上点击任意处选定终点">🎯 地图选点</button>
+              </div>
+              <input type="text" id="endPointInput" value="东莞清溪智能产业园" placeholder="例: 深圳宝安机场 / 东莞松山湖" />
+            </div>
+            <div class="form-item">
+              <label>车长/宽/高 (m)</label>
+              <input type="text" id="truckDimensions" value="13.5 / 2.55 / 4.0" />
+            </div>
+            <div class="form-item">
+              <label>车总重 / 轴数</label>
+              <input type="text" id="truckWeight" value="36.0 吨 / 4 轴" />
+            </div>
+          </div>
+          <div style="font-size:11px; color:#94a3b8; line-height:1.4; margin-top:6px; background:rgba(30,41,59,0.6); padding:6px 10px; border-radius:6px; border-left:3px solid #38bdf8;">
+            💡 <b style="color:#e2e8f0;">输入提示:</b> 高德云端接口需识别真实具体地名（如“深圳北站”、“广州塔”）或坐标，输入“hi”等无地理意义字符会因查无此地报错；您也可点上方【📍 地图选点】在地图上直接点选。
+          </div>
+          <!-- 快捷路线样本芯片 -->
+          <div class="setting-shortcuts" style="margin-top:6px;">
+            <button type="button" class="btn-chip" id="btnSample1" title="广州白云机场 至 深圳宝安机场">✈️ 穗深双机场线</button>
+            <button type="button" class="btn-chip" id="btnSample2" title="深圳盐田港 至 东莞凤岗物流园">🚢 盐田港货运线</button>
+            <button type="button" class="btn-chip" id="btnSample3" title="广州黄埔港 至 东莞清溪">🏭 广深高速干线</button>
+          </div>
+          <div class="form-item" style="margin-top:8px;">
+            <label style="font-size:11px; color:#38bdf8;">已授权高德 API Key (可自由更换):</label>
+            <input type="text" id="amapKeyInput" value="1b5afcd4182988278fda8e81237b07d9" style="font-size:11px; padding:6px 8px; font-family:var(--font-mono); color:#4ade80;" />
+          </div>
+          <div class="form-actions" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
+            <button class="btn btn-primary" id="btnCallAmapApi" style="background:linear-gradient(135deg, #0284c7, #0ea5e9); font-weight:700;">
+              <span class="btn-icon">📡</span> 调取高德官方 API 实时算路并绘制走廊
+            </button>
+            <button class="btn btn-secondary" id="btnResetToDefaultRoute" style="font-size:12px;">
+              <span class="btn-icon">🛣️</span> 恢复广深演示基线路线
+            </button>
+            <button class="btn btn-secondary" id="btnLaunchAmapApp">
+              <span class="btn-icon">📲</span> 唤起手机高德地图 App (带强制途经点)
+            </button>
+          </div>
+        </div>
+
+        <!-- 模块2: 偏航判定与安全容差设置 -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">⚙️</span>
+            <h3>偏航判决引擎规则</h3>
+          </div>
+          <div class="rules-settings">
+            <div class="setting-row">
+              <span>管道安全缓冲阈值:</span>
+              <span class="val-display" id="thresholdVal">250 米</span>
+            </div>
+            <input type="range" id="thresholdRange" min="30" max="600" step="10" value="250">
+            <div class="setting-shortcuts">
+              <button class="btn-chip" data-val="30">🚶 30m步行</button>
+              <button class="btn-chip" data-val="80">🛵 80m市区</button>
+              <button class="btn-chip" data-val="250">🚛 250m高速</button>
+            </div>
+            <div class="setting-tip">
+              * 超出该阈值进入判定观察窗（手机步行实测建议选 30~50m）。
+            </div>
+          </div>
+        </div>
+
+        <!-- 模块3: 运行场景仿真控制器 -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">🎮</span>
+            <h3>虚拟仿真演练控制台</h3>
+          </div>
+          <div class="sim-actions-grid">
+            <button class="btn btn-success" id="btnDriveNormal">
+              <span>▶️ 模拟正常行驶</span>
+              <small>沿蓝色指定路线行进</small>
+            </button>
+            <button class="btn btn-danger" id="btnDriveDeviate">
+              <span>⚠️ 模拟擅自下道偏航</span>
+              <small>脱离路线驶入省道</small>
+            </button>
+            <button class="btn btn-warning" id="btnSimTunnel">
+              <span>🚇 模拟进隧道断网</span>
+              <small>断网暂存, 出隧道补传</small>
+            </button>
+            <button class="btn btn-secondary" id="btnResetSim">
+              <span>🔄 仿真复位重置</span>
+              <small>重置车辆状态</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- 模块4: 实时上传与离线暂存管道 (Store & Forward) -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">☁️</span>
+            <h3>实时上传与离线管道 (HTTP/WebSocket)</h3>
+          </div>
+          <div class="buffer-monitor">
+            <div class="buffer-item">
+              <span class="lbl">累计已上报云端:</span>
+              <strong class="count-tag-success" id="uploadedCount">0 次</strong>
+            </div>
+            <div class="buffer-item">
+              <span class="lbl">弱网本地暂存队列:</span>
+              <strong class="count-tag" id="offlineQueueCount">0 条</strong>
+            </div>
+            <div class="buffer-item">
+              <span class="lbl">最近一次上报:</span>
+              <span class="net-tag ok" id="lastUploadTag">就绪</span>
+            </div>
+          </div>
+          <div class="form-item" style="margin-top:8px;">
+            <label style="font-size:11px; color:#38bdf8;">业务后端接收接口 URL (选填):</label>
+            <input type="text" id="uploadApiUrlInput" placeholder="留空为前端模拟；填入如 http://192.168.x.x:8080/api/gps" style="font-size:11px; padding:6px 8px; font-family:var(--font-mono);" />
+          </div>
+          <!-- 实时上传数据包抓包监视器 -->
+          <div class="upload-packet-monitor">
+            <div class="packet-title">
+              <span>📡 最近上报云端 Payload</span>
+              <span class="packet-status" id="packetStatus">HTTP 200 OK</span>
+            </div>
+            <pre class="packet-pre" id="uploadPacketJson">{ "status": "等待第一次定位上报..." }</pre>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 中间与右侧：GIS 地图大屏与双端视角 -->
+      <section class="map-view-section">
+        <!-- 地图容器 -->
+        <div id="map" class="map-container"></div>
+
+        <!-- 导航视角与罗盘回正浮钮 (正北朝上 · 文字正立清晰可读) -->
+        <button class="nav-compass-btn" id="btnToggleHeadingUp" title="点击居中并锁定车辆跟车视角">
+          <span class="compass-needle" id="compassNeedle">🧭</span>
+          <span class="compass-text" id="compassText">锁定跟随</span>
+        </button>
+
+        <!-- 司机导航准备：路线确认卡片 (未开始导航时常驻展示) -->
+        <div class="driver-route-confirm-card" id="driverRouteConfirmCard">
+          <div class="confirm-card-glow"></div>
+          <div class="confirm-card-content">
+            <div class="confirm-badge-row">
+              <span class="task-badge">🛣️ 货运走廊已锁定</span>
+              <button class="btn-switch-route primary-pulse" id="btnOpenRouteSwitchModal" title="选择其他货运干线或输入全国任意起终点">
+                <span class="btn-icon">🔄</span>
+                <span>更换路线 / 自定义算路</span>
+              </button>
+              <span class="corridor-badge">安全走廊: ±250m</span>
+            </div>
+            
+            <div class="confirm-od-group clickable" id="confirmOdClickArea" title="点击更换货运路线或搜索新目的地">
+              <div class="od-col">
+                <span class="od-dot start"></span>
+                <div class="od-texts">
+                  <span class="od-lbl">起运地</span>
+                  <strong class="od-val" id="confirmStartPoint">广州黄埔港物流中心</strong>
+                </div>
+              </div>
+              <div class="od-col-mid">
+                <div class="od-arrow-line">➔</div>
+                <div class="od-dist-val" id="confirmRouteDist">101.9 km</div>
+                <div class="od-change-hint">换路线 ❯</div>
+              </div>
+              <div class="od-col">
+                <span class="od-dot end"></span>
+                <div class="od-texts">
+                  <span class="od-lbl">目的地</span>
+                  <strong class="od-val" id="confirmEndPoint">东莞清溪智能产业园</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 路线方案备选栏：同一起终点 (A ➔ B) 的多种导航方案 (方案1速度最快、方案2避开拥堵、方案3费用最低) -->
+            <div class="route-choice-chips-bar" id="routeChoiceChipsBar">
+              <span class="choice-title">方案备选:</span>
+              <button class="route-chip-btn active" data-candidate-index="0" title="走S3沿江高速全程主线，速度最快，红绿灯少">
+                <span class="chip-tag best">方案1·推荐</span>
+                <span class="chip-name">S3广深沿江高速 (111.9km·1时53分·￥64)</span>
+              </button>
+              <button class="route-chip-btn" data-candidate-index="1" title="绕行萝岗及东二环互通，避开沿江大流量施工">
+                <span class="chip-tag">方案2·避施工</span>
+                <span class="chip-name">萝岗/东二环高速 (122.9km·1时58分·￥71)</span>
+              </button>
+              <button class="route-chip-btn" data-candidate-index="2" title="经由广园快速路及G107国道地面干线，全程过路费￥0">
+                <span class="chip-tag">方案3·免路费</span>
+                <span class="chip-name">广园快速/地面快线 (101.9km·3时28分·免费)</span>
+              </button>
+              <button class="route-chip-btn more-btn" id="btnChipOpenMore" title="打开弹窗切换起终点城市或自定义算路">
+                <span>换城市 ❯</span>
+              </button>
+            </div>
+
+            <div class="confirm-meta-row">
+              <span class="meta-item">⏱️ 预估 <strong id="confirmDuration">102</strong> 分钟</span>
+              <span class="meta-item">🚛 13.5m重卡/4轴/36T</span>
+              <span class="meta-item">⚠️ 限高 4.0m</span>
+              <span class="meta-item">📡 偏航实时抓拍</span>
+            </div>
+
+            <div class="confirm-cta-row">
+              <button class="btn-confirm-start-nav" id="btnConfirmStartNav">
+                <span class="btn-ripple"></span>
+                <span class="btn-icon">🚀</span>
+                <div class="btn-label-group">
+                  <strong>确认导航路线 · 开始实时导航</strong>
+                  <small>自动开启手机芯片定位与偏航语音播报</small>
+                </div>
+              </button>
+              <button class="btn-quick-amap-app" id="btnDriverWakeAmapApp" title="调起手机已安装的高德App">
+                <span>📲 高德App</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 司机正在驾驶导航：顶部高德经典 TBT 转向指引卡片 -->
+        <div class="amap-nav-top-card" id="driverInnavTop" style="display:none;">
+          <!-- 核心转向与路段信息 -->
+          <div class="amap-guidance-main">
+            <!-- 左侧大转向标与倒计时距离 -->
+            <div class="amap-turn-box">
+              <div class="amap-turn-svg-wrap" id="innavTurnIcon">
+                <svg viewBox="0 0 48 48" class="turn-svg-icon" id="turnSvgPath">
+                  <path d="M24 10 L24 38 M24 10 L14 20 M24 10 L34 20" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+              </div>
+              <div class="amap-turn-dist-group">
+                <span class="amap-turn-dist-val" id="amapTurnDist">850<small>米</small></span>
+                <span class="amap-turn-action" id="amapTurnAction">沿主路直行</span>
+              </div>
+            </div>
+
+            <!-- 中间当前主干道与下一转向提示 -->
+            <div class="amap-road-group">
+              <div class="amap-current-road" id="innavRoadName">广深沿江高速 (S33)</div>
+              <div class="amap-next-road-preview" id="amapNextRoadPreview">随后 靠右侧驶入 麻涌特大桥</div>
+              <div class="amap-traffic-pill smooth" id="innavTrafficPill">🟢 道路通畅 · 合规巡航</div>
+            </div>
+
+            <!-- 右侧限速盘与测速拍照 -->
+            <div class="amap-speed-limit-badge">
+              <div class="limit-circle" id="speedLimitCircle">
+                <span class="limit-num" id="speedLimitVal">80</span>
+              </div>
+              <span class="radar-tag">📷 测速</span>
+            </div>
+          </div>
+
+          <!-- 车道指引示意条 (Lane Guidance) -->
+          <div class="amap-lane-indicator" id="amapLaneIndicator">
+            <span class="lane-label">推荐车道</span>
+            <div class="lane-slots" id="laneSlotsContainer">
+              <div class="lane-slot muted" title="1车道">↑</div>
+              <div class="lane-slot active" title="2车道 (货车推荐)">↑</div>
+              <div class="lane-slot active" title="3车道 (货车推荐)">↑</div>
+              <div class="lane-slot muted" title="4车道 (慢车道)">↱</div>
+            </div>
+          </div>
+
+          <!-- 货运审批合规走廊状态条 -->
+          <div class="amap-corridor-strip" id="innavCorridorStatus">
+            <div class="corridor-status-left">
+              <span class="status-indicator-dot safe" id="innavDot"></span>
+              <span id="innavStatusText">审批合规走廊行驶中 · 距中心线 12 米</span>
+            </div>
+            <div class="corridor-threshold-tag">走廊: ±250m</div>
+          </div>
+        </div>
+
+        <!-- 司机正在驾驶导航：右侧高德经典蚯蚓路况光柱与工具坞 -->
+        <div class="amap-right-dock" id="amapRightDock" style="display:none;">
+          <!-- 垂直路况光柱蚯蚓条 (真实路况红黄绿分段，车标由下至上随行程推进) -->
+          <div class="amap-traffic-worm" id="amapTrafficWorm" title="全程路况畅通指数与行车进度">
+            <span class="worm-end-tag">清溪</span>
+            <div class="worm-bar-track" id="wormBarTrack">
+              <div class="worm-segment green" style="height: 15%;" title="终点园区大道 畅通"></div>
+              <div class="worm-segment yellow" style="height: 8%;" title="清溪出口匝道 缓行"></div>
+              <div class="worm-segment green" style="height: 22%;" title="虎门长安主线 畅通"></div>
+              <div class="worm-segment red" style="height: 7%;" title="沙田互通施工 拥堵"></div>
+              <div class="worm-segment yellow" style="height: 8%;" title="麻涌洪梅段 缓行"></div>
+              <div class="worm-segment green" style="height: 25%;" title="沿江高速主线 畅通"></div>
+              <div class="worm-segment yellow" style="height: 8%;" title="开发大道入口 缓行"></div>
+              <div class="worm-segment green" style="height: 15%;" title="黄埔港出港段 畅通"></div>
+              <!-- 随行程沿途滑动的货车光标 (从起点黄埔底部 0% 往终点清溪顶部 100% 推进) -->
+              <div class="worm-truck-indicator" id="wormTruckIndicator" style="bottom: 0%;">
+                <span>🚚</span>
+              </div>
+            </div>
+            <span class="worm-start-tag">黄埔</span>
+          </div>
+
+          <!-- 导航右侧快捷浮钮 -->
+          <div class="amap-float-actions">
+            <!-- 真实路况图层开关 -->
+            <button class="amap-float-btn active-traffic" id="btnToggleTrafficLayer" title="开启/关闭高德官方实时路况">
+              <span class="icon">🚦</span>
+              <span class="lbl" id="lblTrafficStatus">路况开</span>
+            </button>
+            <!-- 推流车速档位调节 (慢速真实体感/标准巡航/极速快进) -->
+            <button class="amap-float-btn speed-slow" id="btnToggleSimSpeed" title="调节仿真推流速度 (慢速真实/标准/极速)">
+              <span class="icon" id="iconSimSpeed">🐢</span>
+              <span class="lbl" id="lblSimSpeed">慢速</span>
+            </button>
+            <button class="amap-float-btn" id="btnToggle3DView" title="切换 2D平面 / 3D俯视导航视角">
+              <span class="icon" id="icon3DMode">3D</span>
+              <span class="lbl">视角</span>
+            </button>
+            <button class="amap-float-btn" id="btnInnavToggleAudio" title="开启/静音语音播报">
+              <span class="icon" id="innavAudioIcon">🔊</span>
+              <span class="lbl">语音</span>
+            </button>
+            <button class="amap-float-btn alert" id="btnQuickDeviateSim" title="快速触发偏航模拟 (测试偏航预警)">
+              <span class="icon">⚠️</span>
+              <span class="lbl" id="lblQuickDeviate">偏航测试</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 司机正在驾驶导航：底部高德标准行程仪表与控制台 -->
+        <div class="amap-nav-bottom-card" id="driverInnavBottom" style="display:none;">
+          <!-- 上层：高德行程核心指标 (预计到达、剩余时间/里程、实时车速) -->
+          <div class="amap-bottom-metrics">
+            <div class="metric-eta-group">
+              <div class="metric-big-time">
+                <strong id="amapRemainingTime">1小时28分</strong>
+                <small id="amapArrivalTime">预计 12:28 抵达</small>
+              </div>
+              <div class="metric-sub-tags">
+                <span class="sub-tag dist"><strong id="amapRemainingDist">101.9</strong> 公里</span>
+                <span class="sub-tag deviation" id="innavDeviationDist">偏离 0m</span>
+                <span class="sub-tag traffic-lights">🚥 3个红绿灯</span>
+              </div>
+            </div>
+
+            <!-- 右侧实时速度与安全巡航标牌 -->
+            <div class="metric-live-speed-box">
+              <div class="speed-val" id="innavLiveSpeed">0</div>
+              <div class="speed-unit-wrap">
+                <span>km/h</span>
+                <span class="speed-status safe" id="speedStatusTag">合规巡航</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 下层：高德经典底部操作按钮行 -->
+          <div class="amap-bottom-actions">
+            <button class="amap-action-btn" id="btnInnavOverview" title="查看整条规划路线全景">
+              <span class="icon">🗺️</span>
+              <span>全览</span>
+            </button>
+            <button class="amap-action-btn" id="btnInnavRecenter" title="重置并锁定跟随车辆">
+              <span class="icon">📍</span>
+              <span>居中跟车</span>
+            </button>
+            <button class="amap-action-btn primary" id="btnInnavWakeAmap" title="调起手机已安装的高德App">
+              <span class="icon">📲</span>
+              <span>高德App</span>
+            </button>
+            <button class="amap-action-btn danger" id="btnInnavStopNav" title="退出驾驶导航">
+              <span class="icon">🛑</span>
+              <span>退出导航</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 移动端底栏快捷操作浮条 -->
+        <div class="mobile-quick-bar" id="mobileQuickBar">
+          <button class="quick-btn primary" id="btnMobileToggleGps">
+            <span class="icon">📱</span>
+            <span class="txt" id="mobileGpsBtnTxt">开启定位</span>
+          </button>
+          <button class="quick-btn" id="btnMobilePlanHere">
+            <span class="icon">🎯</span>
+            <span class="txt">定为起点</span>
+          </button>
+          <button class="quick-btn" id="btnMobileCenter">
+            <span class="icon">📍</span>
+            <span class="txt">居中回位</span>
+          </button>
+          <button class="quick-btn" id="btnMobileOpenMenu">
+            <span class="icon">⚙️</span>
+            <span class="txt">控制面板</span>
+          </button>
+        </div>
+
+        <!-- 司机端：全屏偏航报警浮层 (红色闪烁边框 + 大字提示，仅司机导航模式显示) -->
+        <div class="driver-deviation-overlay" id="driverDeviationOverlay" aria-live="assertive" role="alert">
+          <div class="ddo-card">
+            <div class="ddo-icon">⚠️</div>
+            <div class="ddo-title">您已偏离规划路线</div>
+            <div class="ddo-dist">已偏离 <strong id="ddoDist">0</strong> 米</div>
+            <div class="ddo-tip">请按导航指引尽快返回规划路线，偏航记录已同步上报调度中心</div>
+            <button class="ddo-ack" id="btnDdoAck">我知道了</button>
+          </div>
+        </div>
+
+        <!-- 浮层1: 实时偏航红色声光报警横幅 -->
+        <div class="alarm-banner" id="alarmBanner">
+          <div class="alarm-pulse-ring"></div>
+          <div class="alarm-content">
+            <div class="alarm-icon">🚨</div>
+            <div class="alarm-text">
+              <h4>【严重偏航警报】车辆已偏离预设货运路线！</h4>
+              <p id="alarmDetail">粤B·8890A 当前偏离距离: <strong id="alarmDist">0</strong> 米，请调度员立即核实原因！</p>
+            </div>
+            <button class="btn btn-call" id="btnCallDriver">📞 呼叫司机</button>
+          </div>
+        </div>
+
+        <!-- 浮层2: 车载仪表 HUD (右侧悬浮) -->
+        <div class="hud-dashboard" id="hudDashboard">
+          <div class="hud-header">
+            <div class="hud-title-wrap">
+              <span class="live-dot" id="hudDot"></span>
+              <h4>车载智能 HUD</h4>
+            </div>
+            <span class="hud-source-badge" id="hudSourceBadge">虚拟推流</span>
+          </div>
+          <div class="hud-metrics">
+            <div class="metric-box">
+              <span class="metric-label">时速</span>
+              <span class="metric-val" id="hudSpeed">0</span>
+              <span class="metric-unit">km/h</span>
+            </div>
+            <div class="metric-box">
+              <span class="metric-label">距规划垂距</span>
+              <span class="metric-val" id="hudDevDist">0</span>
+              <span class="metric-unit">米</span>
+            </div>
+            <div class="metric-box">
+              <span class="metric-label">状态</span>
+              <span class="metric-val status-text normal" id="hudStatus">就绪</span>
+            </div>
+          </div>
+          <div class="hud-road">
+            <span class="lbl">道路/位置:</span>
+            <span class="road-name" id="hudRoad">广深沿江高速主线 (K42+100)</span>
+          </div>
+        </div>
+
+        <!-- 底部浮层: 调度实时事件流水流水 -->
+        <div class="event-logs-panel" id="eventLogsPanel">
+          <div class="logs-header">
+            <span>📋 调度中心实时遥测与上传日志</span>
+            <div class="logs-actions">
+              <button class="btn-clear-logs" id="btnToggleLogsFold">收起</button>
+              <button class="btn-clear-logs" id="btnClearLogs">清空</button>
+            </div>
+          </div>
+          <div class="logs-list" id="logsList">
+            <div class="log-item info">
+              <span class="time">[系统就绪]</span>
+              <span class="msg">高德货车算法引擎已就绪，已根据 13.5米半挂车规划最佳避险路线。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 手机端定位权限温馨提示浮窗 (非安全源或被拒时提醒) -->
+  <div class="geo-tip-modal" id="geoTipModal" style="display:none;">
+    <div class="geo-modal-card">
+      <div class="geo-modal-header">
+        <span class="geo-modal-icon">⚠️</span>
+        <h3>手机 GPS 定位授权提示</h3>
+      </div>
+      <div class="geo-modal-body">
+        <p id="geoTipMessage">移动端浏览器要求必须在 <strong>HTTPS 协议</strong> 或 <strong>localhost</strong> 下才能直接读取物理 GPS。</p>
+        <div class="tip-guide">
+          <strong>📱 手机无法开启定位常见排查：</strong>
+          <ol>
+            <li><strong>手机浏览器权限</strong>：请检查是否在弹窗中点击了“允许使用当前位置”；</li>
+            <li><strong>系统定位服务</strong>：请确认手机系统设置已开启“GPS/位置信息”；</li>
+            <li><strong>内网 HTTP 访问限制</strong>：安卓 Chrome 可在 <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code> 将当前局域网地址设为受信任。</li>
+          </ol>
+        </div>
+      </div>
+      <div class="geo-modal-footer">
+        <button class="btn btn-primary" id="btnCloseGeoTip">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 货运路线切换与高德智能算路全功能弹窗 -->
+  <div class="route-switch-modal" id="routeSwitchModal" style="display:none;">
+    <div class="route-modal-backdrop" id="routeModalBackdrop"></div>
+    <div class="route-modal-card">
+      <div class="route-modal-header">
+        <div class="route-modal-title">
+          <span class="modal-icon">🛣️</span>
+          <div class="modal-title-text">
+            <h3>货运路线切换与智能规划</h3>
+            <small>可一键选择大湾区核心货运干线，或自定义输入全国任意起终点实时算路</small>
+          </div>
+        </div>
+        <button class="btn-close-modal" id="btnCloseRouteModal" title="关闭弹窗">✕</button>
+      </div>
+
+      <!-- Tab 切换标签 -->
+      <div class="route-modal-tabs">
+        <button class="route-tab-btn active" id="tabPresetRoutes">🌟 精品货运干线 (秒换)</button>
+        <button class="route-tab-btn" id="tabCustomRoute">🔍 全国任意起终点算路</button>
+      </div>
+
+      <div class="route-modal-body">
+        <!-- 标签页 1: 预设精品专线 -->
+        <div class="route-tab-content active" id="contentPresetRoutes">
+          <div class="preset-routes-list">
+            <!-- 路线1: 广深沿江高速主干线 -->
+            <div class="preset-route-item active" data-route-id="guangzhou_dongguan">
+              <div class="preset-badge-row">
+                <span class="preset-tag default">当前推荐基线</span>
+                <span class="preset-highway">S33 广深沿江高速 ➔ 清溪支线</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start">广州黄埔港物流中心</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">东莞清溪智能产业园</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛣️ 101.9 公里</span>
+                  <span>⏱️ 约 102 分钟</span>
+                  <span>🚛 1543 个高精道路节点</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" data-route-id="guangzhou_dongguan">当前路线</button>
+            </div>
+
+            <!-- 路线2: 穗深双机场线 -->
+            <div class="preset-route-item" data-route-id="airport_line">
+              <div class="preset-badge-row">
+                <span class="preset-tag airport">穗深双机场线</span>
+                <span class="preset-highway">S41 机场高速 ➔ 沿江高速 ➔ 机场互通</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start">广州白云国际机场货运站</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">深圳宝安国际机场物流园</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛣️ 128.5 公里</span>
+                  <span>⏱️ 约 115 分钟</span>
+                  <span>✈️ 跨城空运集疏运专线</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" data-route-id="airport_line">切换到此线</button>
+            </div>
+
+            <!-- 路线3: 盐田港进出口货运线 -->
+            <div class="preset-route-item" data-route-id="yantian_fenggang">
+              <div class="preset-badge-row">
+                <span class="preset-tag port">海港集疏运</span>
+                <span class="preset-highway">S28 水官高速 ➔ S27 仁深高速</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start">深圳盐田港物流枢纽</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">东莞凤岗天安数码城物流园</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛣️ 46.2 公里</span>
+                  <span>⏱️ 约 55 分钟</span>
+                  <span>🚢 进出口集装箱干线</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" data-route-id="yantian_fenggang">切换到此线</button>
+            </div>
+
+            <!-- 路线4: 珠江口跨江保税干线 -->
+            <div class="preset-route-item" data-route-id="bay_port_line">
+              <div class="preset-badge-row">
+                <span class="preset-tag bay">跨江保税干线</span>
+                <span class="preset-highway">S32 西部沿海高速 ➔ G0425 广澳高速</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start">珠海高栏港综合保税区</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">广州南沙综合物流园</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛣️ 88.7 公里</span>
+                  <span>⏱️ 约 88 分钟</span>
+                  <span>🌉 跨江出海大通道</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" data-route-id="bay_port_line">切换到此线</button>
+            </div>
+
+            <!-- 路线5: 手机当前位置实测路线 -->
+            <div class="preset-route-item gps-opt" id="itemPlanFromPhoneGps">
+              <div class="preset-badge-row">
+                <span class="preset-tag live">真机实测</span>
+                <span class="preset-highway">以手机当前物理定位生成 2.5km 测试走廊</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start" id="modalGpsStartText">手机物理 GPS 定位点</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">实测规划终点</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛰️ 实时卫星经纬度</span>
+                  <span>🎯 步行/真车室外实测推荐</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" id="btnModalApplyGps">以此定位测试</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 标签页 2: 自定义全国起终点输入 -->
+        <div class="route-tab-content" id="contentCustomRoute" style="display:none;">
+          <div class="custom-route-form">
+            <div class="custom-form-group">
+              <label>起运地 (支持全国城市/地名/路名/坐标):</label>
+              <div class="input-with-action">
+                <input type="text" id="modalStartInput" placeholder="例: 深圳北站 / 广州白云机场 / 广州塔" value="广州黄埔港物流中心" />
+                <button type="button" class="btn-map-pick" id="btnModalPickStart">📍 点选</button>
+              </div>
+            </div>
+
+            <div class="custom-form-group">
+              <label>目的地 (支持全国城市/地名/路名/坐标):</label>
+              <div class="input-with-action">
+                <input type="text" id="modalEndInput" placeholder="例: 东莞松山湖 / 上海洋山港 / 深圳宝安机场" value="东莞清溪智能产业园" />
+                <button type="button" class="btn-map-pick" id="btnModalPickEnd">🎯 点选</button>
+              </div>
+            </div>
+
+            <div class="truck-spec-summary">
+              <span>🚛 货车参数: 13.5m半挂车 · 4轴36吨 · 限高4.0米 (高德合规策略自动避险)</span>
+            </div>
+
+            <button class="btn-submit-custom-route" id="btnModalSubmitRoute">
+              <span class="btn-icon">📡</span>
+              <span>调取高德官方 API 智能规划路线并绘制走廊</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入系统各核心业务模块脚本 (附带版本号防止手机浏览器强行缓存旧脚本) -->
+  <script src="./js/audioAlarm.js?v=20261020_v20"></script>
+  <script src="./js/offlineStorage.js?v=20261020_v20"></script>
+  <!-- 引入高德官方真实道路规划高精坐标串 (同一起终点多路线方案预设与贴地道路节点) -->
+  <script src="./js/sampleRoutesAB.js?v=20261020_v20"></script>
+  <script src="./js/realRouteData.js?v=20261020_v20"></script>
+  <script src="./js/routeEngine.js?v=20261020_v20"></script>
+  <script src="./js/deviationDetector.js?v=20261020_v20"></script>
+  <script src="./js/simulator.js?v=20261020_v20"></script>
+  <script src="./js/app.js?v=20261020_v20"></script>
+</body>
+</html>

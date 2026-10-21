@@ -1,0 +1,2853 @@
+/* ============================================================
+   智能货运在途监控系统 - 科技暗黑主题样式规范
+   ============================================================ */
+
+:root {
+  --bg-primary: #0a0f1d;
+  --bg-card: rgba(16, 24, 47, 0.85);
+  --bg-card-hover: rgba(22, 34, 66, 0.95);
+  --border-color: rgba(56, 189, 248, 0.2);
+  --border-glow: rgba(56, 189, 248, 0.4);
+  
+  --primary: #38bdf8;       /* 科技天蓝 */
+  --primary-glow: #0284c7;
+  --success: #10b981;       /* 正常通行绿 */
+  --warning: #f59e0b;       /* 警告黄 */
+  --danger: #ef4444;        /* 偏航告警红 */
+  --danger-glow: rgba(239, 68, 68, 0.4);
+  
+  --text-main: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-dim: #64748b;
+  
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* 整体容器 */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* 顶部科技导航条 */
+.app-header {
+  height: 64px;
+  background: rgba(10, 15, 29, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 1000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-badge {
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
+  color: #fff;
+  font-weight: 900;
+  font-size: 14px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+}
+
+.header-left h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.header-left h1 span {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.system-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 24, 47, 0.9);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-indicator.online {
+  background-color: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.status-indicator.offline {
+  background-color: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+  animation: blink 1s infinite alternate;
+}
+
+@keyframes blink {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+.vehicle-badge {
+  font-size: 13px;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.vehicle-badge strong {
+  color: var(--primary);
+  margin-left: 4px;
+}
+
+/* 主工作区两栏布局 */
+.app-main {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 64px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 左侧控制栏 */
+.control-panel {
+  width: 380px;
+  min-width: 380px;
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid var(--border-color);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  z-index: 500;
+}
+
+.panel-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.panel-card.highlight-card {
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: rgba(16, 28, 56, 0.85);
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+}
+
+.card-title .icon {
+  font-size: 16px;
+}
+
+.card-title h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* 表单输入与配置 */
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-item label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.form-item input {
+  background: rgba(2, 6, 23, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-item input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 6px var(--primary-glow);
+}
+
+.form-actions {
+  margin-top: 10px;
+}
+
+/* 按钮通用系统 */
+.btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.4);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #0369a1, #075985);
+  transform: translateY(-1px);
+}
+
+.sim-actions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sim-actions-grid .btn {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 14px;
+}
+
+.sim-actions-grid .btn span {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sim-actions-grid .btn small {
+  font-size: 11px;
+  opacity: 0.8;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.btn-success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #6ee7b7;
+}
+.btn-success:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.btn-warning {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #fde68a;
+}
+.btn-warning:hover {
+  background: rgba(245, 158, 11, 0.3);
+}
+
+.btn-secondary {
+  background: rgba(100, 116, 139, 0.2);
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  color: #cbd5e1;
+}
+.btn-secondary:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+/* 滑块设置 */
+.rules-settings .setting-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.rules-settings .val-display {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.rules-settings input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.setting-tip {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* 离线暂存监控 */
+.buffer-monitor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.buffer-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.buffer-item .lbl {
+  color: var(--text-secondary);
+}
+
+.count-tag {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.net-tag.ok {
+  color: var(--success);
+}
+.net-tag.warn {
+  color: var(--warning);
+}
+
+/* 右侧大屏与地图 */
+.map-view-section {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+  background: #020617;
+}
+
+/* 偏航声光报警顶栏 */
+.alarm-banner {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-150%);
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.95), rgba(127, 29, 29, 0.95));
+  backdrop-filter: blur(8px);
+  border: 2px solid var(--danger);
+  border-radius: 12px;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 0 30px var(--danger-glow);
+  z-index: 1200;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.alarm-banner.active {
+  transform: translateX(-50%) translateY(0);
+}
+
+.alarm-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.alarm-icon {
+  font-size: 32px;
+  animation: pulse-bell 0.8s infinite alternate;
+}
+
+@keyframes pulse-bell {
+  from { transform: scale(0.9); }
+  to { transform: scale(1.15); }
+}
+
+.alarm-text h4 {
+  font-size: 16px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.alarm-text p {
+  font-size: 13px;
+  color: #fecaca;
+  margin-top: 2px;
+}
+
+.btn-call {
+  background: #fff;
+  color: #991b1b;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-call:hover {
+  background: #fee2e2;
+}
+
+/* 车载 HUD 仪表盘 (悬浮在右上角) */
+.hud-dashboard {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 280px;
+  background: rgba(10, 15, 29, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px;
+  z-index: 900;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.hud-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--success);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--success);
+}
+
+.hud-header h4 {
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.hud-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.metric-box {
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+
+.metric-box:last-child {
+  grid-column: span 2;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: block;
+}
+
+.metric-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--primary);
+  margin: 2px 0;
+}
+
+.metric-unit {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.status-text.normal {
+  color: var(--success);
+  font-size: 14px;
+}
+.status-text.deviated {
+  color: var(--danger);
+  font-size: 14px;
+  animation: blink 0.8s infinite alternate;
+}
+.status-text.tunnel {
+  color: var(--warning);
+  font-size: 14px;
+}
+
+.hud-road {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-road .road-name {
+  color: #fff;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+/* 底部事件流水面板 */
+.event-logs-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  height: 120px;
+  background: rgba(10, 15, 29, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  z-index: 900;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.logs-header {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.btn-clear-logs {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 11px;
+}
+.btn-clear-logs:hover {
+  color: var(--text-main);
+}
+
+.logs-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-item {
+  display: flex;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.log-item .time {
+  color: var(--text-dim);
+}
+
+.log-item.info .msg {
+  color: var(--text-secondary);
+}
+.log-item.warn .msg {
+  color: var(--warning);
+}
+.log-item.alarm .msg {
+  color: #f87171;
+  font-weight: 600;
+}
+.log-item.success .msg {
+  color: #4ade80;
+}
+
+/* Leaflet 地图覆盖物定制样式 */
+.custom-truck-icon {
+  background: transparent;
+  border: none;
+}
+
+.truck-marker-wrap {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  position: relative;
+  transition: transform 0.3s ease;
+}
+
+.truck-pulse-ring {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  animation: radar-pulse 2s infinite ease-out;
+}
+
+.truck-marker-wrap.deviated .truck-pulse-ring {
+  border-color: var(--danger);
+  animation: radar-pulse-danger 0.8s infinite ease-out;
+}
+
+@keyframes radar-pulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes radar-pulse-danger {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ============================================================
+   手机真机模式与移动端自适应增强样式
+   ============================================================ */
+
+/* 顶部模式切换徽章 */
+.mode-badge-wrap {
+  display: flex;
+  align-items: center;
+}
+.mode-tag {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+}
+.mode-tag.sim {
+  background: rgba(2, 132, 199, 0.2);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+.mode-tag.real {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid var(--success);
+  color: #34d399;
+  animation: pulse-border 1.5s infinite;
+}
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.9); }
+}
+
+/* 顶部移动端抽屉开关按钮 (PC端默认隐藏) */
+.mobile-menu-toggle {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid var(--primary);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mobile-menu-toggle:active {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+.mobile-sidebar-close {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 700;
+  color: var(--primary);
+}
+.mobile-sidebar-close button {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mobile-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1500;
+}
+
+/* 手机真机 GPS 专属卡片 */
+.real-gps-card {
+  background: linear-gradient(135deg, rgba(16, 28, 56, 0.95), rgba(6, 78, 59, 0.4));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.15);
+}
+.tag-live {
+  margin-left: auto;
+  font-size: 11px;
+  background: #10b981;
+  color: #022c22;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.real-gps-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-gps-primary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.btn-gps-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+.btn-gps-primary.active {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+.btn-gps-primary .btn-icon {
+  font-size: 24px;
+}
+.btn-gps-primary .btn-text strong {
+  display: block;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+.btn-gps-primary .btn-text small {
+  display: block;
+  font-size: 11px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.gps-sub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.btn-sub {
+  flex: 1 1 calc(50% - 6px);
+  background: rgba(16, 24, 47, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--text-main);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.btn-sub:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: var(--primary);
+}
+
+.gps-telemetry-box {
+  margin-top: 10px;
+  background: rgba(10, 15, 29, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.telemetry-row .lbl {
+  color: var(--text-secondary);
+}
+.telemetry-row .val {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* 开关组件 */
+.switch-wrap {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.switch-wrap input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #334155;
+  transition: .3s;
+  border-radius: 20px;
+}
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+.switch-wrap input:checked + .switch-slider {
+  background-color: var(--primary);
+}
+.switch-wrap input:checked + .switch-slider:before {
+  transform: translateX(16px);
+}
+
+/* 阈值快捷芯片 */
+.setting-shortcuts {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.btn-chip {
+  flex: 1;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  color: var(--text-secondary);
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.btn-chip:hover, .btn-chip.active {
+  background: var(--primary);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* 上报状态与抓包监控 */
+.count-tag-success {
+  color: #34d399;
+  font-size: 15px;
+  font-family: var(--font-mono);
+}
+.upload-packet-monitor {
+  margin-top: 12px;
+  background: #020617;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+}
+.packet-title {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.packet-status {
+  color: #4ade80;
+  font-family: var(--font-mono);
+}
+.packet-pre {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #38bdf8;
+  max-height: 80px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.3;
+}
+
+/* 移动端底栏快捷操作浮条 */
+.mobile-quick-bar {
+  display: none;
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  height: 54px;
+  background: rgba(10, 15, 29, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glow);
+  border-radius: 27px;
+  z-index: 1100;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  justify-content: space-around;
+  align-items: center;
+}
+.quick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 10px;
+  gap: 2px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+.quick-btn .icon {
+  font-size: 18px;
+}
+.quick-btn.primary {
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
+  color: #fff;
+  padding: 6px 14px;
+  font-weight: 700;
+}
+.quick-btn.primary.active {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+}
+
+/* HUD 顶部来源标记 */
+.hud-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hud-source-badge {
+  font-size: 10px;
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* 权限提示弹窗 */
+.geo-tip-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+.geo-modal-card {
+  background: #0f172a;
+  border: 1px solid var(--border-glow);
+  border-radius: 12px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+}
+.geo-modal-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.geo-modal-header h3 {
+  font-size: 16px;
+  color: #fff;
+}
+.geo-modal-icon {
+  font-size: 20px;
+}
+.geo-modal-body {
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.geo-modal-body p {
+  margin-bottom: 12px;
+}
+.tip-guide {
+  background: rgba(16, 24, 47, 0.8);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tip-guide strong {
+  color: var(--primary);
+  display: block;
+  margin-bottom: 6px;
+}
+.tip-guide ol {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tip-guide code {
+  background: #020617;
+  color: #38bdf8;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.geo-modal-footer {
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ============================================================
+   移动端屏幕断点响应式适配 (@media max-width: 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+  body {
+    overflow: hidden;
+  }
+  .app-header {
+    height: 54px;
+    padding: 0 12px;
+  }
+  .header-left h1 {
+    font-size: 14px;
+  }
+  .header-left h1 span {
+    display: none;
+  }
+  .logo-badge {
+    display: none;
+  }
+  .vehicle-badge {
+    display: none;
+  }
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  /* 控制面板抽屉化 */
+  .control-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 86vw;
+    max-width: 360px;
+    min-width: unset;
+    z-index: 2000;
+    transform: translateX(-105%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.8);
+  }
+  .control-panel.mobile-open {
+    transform: translateX(0);
+  }
+  .mobile-sidebar-backdrop.active {
+    display: block;
+  }
+  .mobile-sidebar-close {
+    display: flex;
+  }
+
+  /* 地图占满全屏 */
+  .map-view-section {
+    width: 100vw;
+    height: calc(100vh - 54px);
+  }
+
+  /* 移动端快捷浮动栏显示 */
+  .mobile-quick-bar {
+    display: flex;
+  }
+
+  /* HUD 在手机上自适应吸附在顶部右上 */
+  .hud-dashboard {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    padding: 10px 14px;
+  }
+  .hud-metrics {
+    gap: 8px;
+  }
+  .metric-box .metric-val {
+    font-size: 18px;
+  }
+
+  /* 底部日志面板收拢到浮动栏上方 */
+  .event-logs-panel {
+    bottom: 72px;
+    left: 10px;
+    right: 10px;
+    height: 90px;
+    transition: height 0.25s ease;
+  }
+  .event-logs-panel.folded {
+    height: 34px;
+  }
+  .event-logs-panel.folded .logs-list {
+    display: none;
+  }
+}
+
+/* ============================================================
+   全新：司机专属实时导航模式 & 手机真机仿真屏幕样式
+   ============================================================ */
+
+/* 顶部视图切换药丸选项卡 */
+.view-mode-tabs {
+  display: flex;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 3px;
+  border-radius: 24px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.view-mode-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.25s ease;
+}
+
+.view-mode-btn:hover {
+  color: #fff;
+}
+
+.view-mode-btn.active {
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(14, 165, 233, 0.45);
+}
+
+/* 司机模式下的整体布局控制 */
+body.mode-driver .control-panel {
+  display: none !important;
+}
+
+body.mode-driver .event-logs-panel,
+body.mode-driver .hud-dashboard,
+body.mode-driver .mobile-quick-bar {
+  display: none !important;
+}
+
+body.mode-driver .map-view-section {
+  width: 100%;
+  flex: 1;
+}
+
+/* 电脑大屏下的手机真机仿真框 (iPhone 尺寸仿真) */
+body.mode-driver.desktop-phone-sim-active .app-main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+  padding: 16px 0;
+  overflow: hidden;
+}
+
+body.mode-driver.desktop-phone-sim-active .map-view-section {
+  width: 390px !important;
+  max-width: 390px !important;
+  height: 820px !important;
+  max-height: calc(100vh - 96px) !important;
+  border-radius: 44px;
+  border: 9px solid #334155;
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.9), 0 0 0 2px rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  position: relative;
+  flex: none;
+}
+
+/* 手机仿真的灵动岛/听筒装饰 */
+body.mode-driver.desktop-phone-sim-active .map-view-section::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 24px;
+  background: #000;
+  border-radius: 16px;
+  z-index: 3000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+/* 顶部桌面端手机尺寸切换栏 (只在电脑端大屏显示) */
+.desktop-phone-frame-bar {
+  display: none;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 3px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+body.mode-driver .desktop-phone-frame-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .desktop-phone-frame-bar {
+    display: none !important;
+  }
+}
+
+.frame-opt-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.frame-opt-btn.active {
+  background: #0ea5e9;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ============================================================
+   司机导航卡片1：路线确认与出发准备卡片 (未开始导航时常驻展示)
+   ============================================================ */
+.driver-route-confirm-card {
+  position: absolute;
+  bottom: 20px;
+  left: 16px;
+  right: 16px;
+  z-index: 1500;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  border-radius: 22px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(14, 165, 233, 0.2);
+  padding: 18px;
+  animation: slideUpCard 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+@keyframes slideUpCard {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.confirm-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.task-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(14, 165, 233, 0.15);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.corridor-badge {
+  font-size: 11px;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.confirm-od-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(30, 41, 59, 0.65);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.od-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.od-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.od-dot.start {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.od-dot.end {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.od-texts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.od-lbl {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.od-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.od-col-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.od-arrow-line {
+  color: #38bdf8;
+  font-size: 14px;
+}
+
+.od-dist-val {
+  font-size: 11px;
+  color: #38bdf8;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.confirm-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.meta-item {
+  font-size: 10px;
+  background: rgba(51, 65, 85, 0.6);
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #cbd5e1;
+}
+
+.meta-item strong {
+  color: #38bdf8;
+}
+
+.confirm-cta-row {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-confirm-start-nav {
+  flex: 1;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-confirm-start-nav:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.55);
+}
+
+.btn-confirm-start-nav .btn-icon {
+  font-size: 20px;
+}
+
+.btn-label-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.btn-label-group strong {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.btn-label-group small {
+  font-size: 10px;
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+.btn-quick-amap-app {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  border-radius: 14px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-quick-amap-app:hover {
+  background: rgba(14, 165, 233, 0.2);
+  color: #fff;
+}
+
+/* ============================================================
+   全新：高德标准车载实时导航 UI 系统 (AutoNavi Live Navigation)
+   ============================================================ */
+
+/* 1. 顶部经典 TBT 转向大卡片 */
+.amap-nav-top-card {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  right: 12px;
+  z-index: 1500;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 18px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75);
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: slideDownBanner 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.3s ease;
+}
+
+.amap-nav-top-card.alarm {
+  border-color: rgba(239, 68, 68, 0.85);
+  background: rgba(35, 10, 15, 0.96);
+  box-shadow: 0 14px 40px rgba(239, 68, 68, 0.45);
+  animation: topCardAlertPulse 1s infinite alternate;
+}
+
+@keyframes topCardAlertPulse {
+  from { border-color: rgba(239, 68, 68, 0.6); }
+  to { border-color: #ef4444; box-shadow: 0 0 25px rgba(239, 68, 68, 0.7); }
+}
+
+/* 主转向与路名指引 */
+.amap-guidance-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.amap-turn-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.amap-turn-svg-wrap {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+}
+
+.amap-nav-top-card.alarm .amap-turn-svg-wrap {
+  background: linear-gradient(135deg, #b91c1c, #ef4444);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5);
+}
+
+.turn-svg-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.amap-turn-dist-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.amap-turn-dist-val {
+  font-size: 24px;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  color: #fff;
+  line-height: 1;
+}
+
+.amap-turn-dist-val small {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 2px;
+  color: #94a3b8;
+}
+
+.amap-turn-action {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-top: 3px;
+}
+
+.amap-nav-top-card.alarm .amap-turn-action {
+  color: #f87171;
+}
+
+.amap-road-group {
+  flex: 1;
+  min-width: 0;
+  padding-left: 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.amap-current-road {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.amap-next-road-preview {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 3px;
+}
+
+/* 顶部卡片真实路况状态徽章 */
+.amap-traffic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  margin-top: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  letter-spacing: 0.3px;
+}
+
+.amap-traffic-pill.slow {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+}
+
+.amap-traffic-pill.congested {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #f87171;
+  animation: pulseTrafficAlert 1.5s infinite;
+}
+
+@keyframes pulseTrafficAlert {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.98); }
+}
+
+/* 限速标牌 */
+.amap-speed-limit-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 3px;
+}
+
+.limit-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid #ef4444;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.limit-num {
+  font-size: 14px;
+  font-weight: 900;
+  color: #000;
+  line-height: 1;
+}
+
+.radar-tag {
+  font-size: 9px;
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+/* 车道推荐指示条 (Lane Guidance) */
+.amap-lane-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lane-label {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.lane-slots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lane-slot {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.08);
+  color: #64748b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.lane-slot.active {
+  background: rgba(16, 185, 129, 0.25);
+  color: #10b981;
+  border-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+/* 合规走廊状态条 */
+.amap-corridor-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.corridor-status-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #10b981;
+}
+
+.amap-nav-top-card.alarm .corridor-status-left {
+  color: #ef4444;
+  font-weight: 800;
+}
+
+.corridor-threshold-tag {
+  font-size: 10px;
+  color: #64748b;
+  font-family: var(--font-mono);
+}
+
+/* 2. 右侧高德经典蚯蚓路况光柱与工具坞 */
+.amap-right-dock {
+  position: absolute;
+  top: 145px;
+  right: 12px;
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.amap-traffic-worm {
+  width: 28px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.worm-end-tag, .worm-start-tag {
+  font-size: 8px;
+  color: #94a3b8;
+  font-weight: 800;
+  writing-mode: vertical-rl;
+  letter-spacing: 1px;
+}
+
+.worm-bar-track {
+  width: 8px;
+  height: 140px;
+  border-radius: 4px;
+  background: #334155;
+  position: relative;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+.worm-segment {
+  width: 100%;
+}
+
+.worm-segment.green {
+  background: #10b981;
+}
+
+.worm-segment.yellow {
+  background: #f59e0b;
+}
+
+.worm-segment.red {
+  background: #ef4444;
+}
+
+.worm-truck-indicator {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  font-size: 13px;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.9));
+  transition: bottom 0.4s ease;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.amap-float-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.amap-float-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s ease;
+}
+
+.amap-float-btn:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: #38bdf8;
+  transform: scale(1.06);
+}
+
+.amap-float-btn .icon {
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.amap-float-btn .lbl {
+  font-size: 8px;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+
+.amap-float-btn.alert {
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.amap-float-btn.alert .icon {
+  color: #f87171;
+}
+
+.amap-float-btn.active-3d {
+  background: rgba(14, 165, 233, 0.35);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* 实时路况与速度控制浮钮激活样式 */
+.amap-float-btn.active-traffic {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+.amap-float-btn.speed-slow {
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+}
+
+.amap-float-btn.speed-normal {
+  border-color: rgba(16, 185, 129, 0.6);
+  color: #34d399;
+}
+
+.amap-float-btn.speed-fast {
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #fbbf24;
+}
+
+/* 3. 底部高德标准行程仪表与控制台 */
+.amap-nav-bottom-card {
+  position: absolute;
+  bottom: 16px;
+  left: 12px;
+  right: 12px;
+  z-index: 1500;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slideUpCard 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.amap-bottom-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-eta-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-big-time {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.metric-big-time strong {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.metric-big-time small {
+  font-size: 11px;
+  color: #10b981;
+  font-weight: 700;
+}
+
+.metric-sub-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.sub-tag.dist strong {
+  color: #38bdf8;
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.sub-tag.deviation {
+  color: #10b981;
+}
+
+.sub-tag.deviation.alarm {
+  color: #ef4444;
+  font-weight: 800;
+}
+
+.metric-live-speed-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.speed-val {
+  font-size: 30px;
+  font-weight: 900;
+  font-family: var(--font-mono);
+  color: #38bdf8;
+  line-height: 1;
+}
+
+.speed-unit-wrap {
+  display: flex;
+  flex-direction: column;
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  line-height: 1.1;
+}
+
+.speed-status.safe {
+  color: #10b981;
+}
+
+.speed-status.alarm {
+  color: #ef4444;
+}
+
+/* 底部操作按钮行 */
+.amap-bottom-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.amap-action-btn {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  padding: 8px 6px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.amap-action-btn:hover {
+  background: rgba(51, 65, 85, 0.95);
+  transform: translateY(-1px);
+}
+
+.amap-action-btn.primary {
+  background: rgba(14, 165, 233, 0.25);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+}
+
+.amap-action-btn.primary:hover {
+  background: #0284c7;
+  color: #fff;
+}
+
+.amap-action-btn.danger {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+.amap-action-btn.danger:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* 起终点标记徽章 */
+.od-marker-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 900;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+  border: 2px solid #fff;
+}
+
+.od-marker-badge.start {
+  background: #10b981;
+}
+
+.od-marker-badge.end {
+  background: #f59e0b;
+}
+
+/* 偏航全屏警报红晕闪烁 */
+.phone-mockup-frame.deviation-strobe {
+  animation: frameAlarmStrobe 0.8s infinite alternate !important;
+}
+
+@keyframes frameAlarmStrobe {
+  from { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3), inset 0 0 15px rgba(239, 68, 68, 0.2); }
+  to { box-shadow: 0 0 45px rgba(239, 68, 68, 0.8), inset 0 0 35px rgba(239, 68, 68, 0.5); }
+}
+
+/* ============================================================
+   司机端全屏偏航报警浮层
+   ============================================================ */
+.driver-deviation-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3000;
+  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 6px rgba(239, 68, 68, 0.9);
+  animation: ddoEdgePulse 0.9s infinite alternate;
+}
+
+body.mode-driver .driver-deviation-overlay.active {
+  display: flex;
+}
+
+/* 司机点“我知道了”后：收起中间卡片，但保留红色闪烁边框直到回到路线 */
+.driver-deviation-overlay.acked .ddo-card {
+  display: none;
+}
+
+@keyframes ddoEdgePulse {
+  from { box-shadow: inset 0 0 0 4px rgba(239, 68, 68, 0.6), inset 0 0 40px rgba(239, 68, 68, 0.25); }
+  to { box-shadow: inset 0 0 0 8px rgba(239, 68, 68, 1), inset 0 0 90px rgba(239, 68, 68, 0.55); }
+}
+
+.ddo-card {
+  pointer-events: auto;
+  width: 82%;
+  max-width: 320px;
+  background: linear-gradient(160deg, rgba(185, 28, 28, 0.96), rgba(127, 29, 29, 0.96));
+  border: 2px solid #fca5a5;
+  border-radius: 20px;
+  padding: 22px 18px 18px;
+  text-align: center;
+  color: #fff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(239, 68, 68, 0.6);
+  animation: ddoPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ddoPop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.ddo-icon { font-size: 44px; animation: pulse-bell 0.6s infinite alternate; }
+.ddo-title { font-size: 22px; font-weight: 900; margin-top: 6px; letter-spacing: 1px; }
+.ddo-dist { font-size: 15px; margin-top: 8px; color: #fee2e2; }
+.ddo-dist strong { font-size: 30px; font-weight: 900; color: #fff; margin: 0 4px; }
+.ddo-tip { font-size: 12px; color: #fecaca; margin-top: 10px; line-height: 1.5; }
+
+.ddo-ack {
+  margin-top: 16px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ddo-ack:active { transform: scale(0.97); }
+
+/* 司机模式下不显示面向调度员的“呼叫司机”横幅，避免与司机浮层重复 */
+body.mode-driver .alarm-banner { display: none; }
+
+/* 司机导航模式下的底图容器：高德原生 WebGL 3D 矢量全屏渲染，原生支持车头朝上与 3D 俯视 */
+body.mode-driver .map-view-section {
+  position: relative;
+  overflow: hidden !important;
+}
+
+body.mode-driver .map-container {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* 导航视角切换罗盘浮动按钮 (车头朝上 / 正北朝上) */
+.nav-compass-btn {
+  position: absolute;
+  top: 76px;
+  right: 14px;
+  z-index: 1500;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 20px;
+  padding: 6px 12px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  transition: all 0.25s ease;
+}
+
+body.mode-driver .nav-compass-btn {
+  display: flex;
+}
+
+.nav-compass-btn:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: #38bdf8;
+  transform: scale(1.04);
+}
+
+.nav-compass-btn.north-up {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #94a3b8;
+}
+
+.compass-needle {
+  font-size: 14px;
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+/* 专业 3D 车载导航车标 (俯视货车 + 动态探路前灯光束) */
+.nav-vehicle-marker {
+  position: relative;
+  width: 52px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s linear;
+}
+
+/* 前车大灯光束 (高科技导航夜视扇形光) */
+.vehicle-light-beam {
+  position: absolute;
+  top: -48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 60px;
+  background: radial-gradient(ellipse at bottom, rgba(56, 189, 248, 0.55) 0%, rgba(56, 189, 248, 0.15) 50%, transparent 80%);
+  clip-path: polygon(25% 100%, 75% 100%, 100% 0%, 0% 0%);
+  pointer-events: none;
+  animation: beamGlow 2s infinite alternate;
+}
+
+@keyframes beamGlow {
+  from { opacity: 0.7; }
+  to { opacity: 1; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6)); }
+}
+
+.vehicle-body {
+  width: 36px;
+  height: 52px;
+  z-index: 2;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
+}
+
+.vehicle-body svg {
+  width: 100%;
+  height: 100%;
+}
+
+.vehicle-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.6);
+  animation: vehicleRadarPulse 2s infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes vehicleRadarPulse {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
+
+/* 偏航状态下车身与光束变红警报 */
+.nav-vehicle-marker.deviated .vehicle-light-beam {
+  background: radial-gradient(ellipse at bottom, rgba(239, 68, 68, 0.7) 0%, rgba(239, 68, 68, 0.2) 50%, transparent 80%);
+}
+.nav-vehicle-marker.deviated .truck-rect {
+  fill: #dc2626 !important;
+  stroke: #ef4444 !important;
+}
+.nav-vehicle-marker.deviated .vehicle-pulse-ring {
+  border-color: rgba(239, 68, 68, 0.9);
+}
+
+/* ============================================================
+   路线切换按钮与可点击 OD 规划卡片交互
+   ============================================================ */
+.btn-switch-route {
+  background: rgba(14, 165, 233, 0.25);
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.btn-switch-route.primary-pulse {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(14, 165, 233, 0.3));
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  animation: switchPulse 2s infinite ease-in-out;
+}
+
+@keyframes switchPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(56, 189, 248, 0.7); border-color: #7dd3fc; }
+}
+
+.btn-switch-route:hover,
+.btn-switch-route:active {
+  background: rgba(14, 165, 233, 0.5);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.6);
+  transform: scale(1.04);
+}
+
+.confirm-od-group.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.confirm-od-group.clickable:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.2);
+}
+
+.od-change-hint {
+  font-size: 10px;
+  color: #38bdf8;
+  font-weight: 600;
+  margin-top: 3px;
+  opacity: 0.85;
+}
+
+/* ============================================================
+   备选路线选择栏 (高德经典多路线方案 Chips)
+   ============================================================ */
+.route-choice-chips-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.route-choice-chips-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.choice-title {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.route-chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 10px;
+  padding: 5px 10px;
+  color: #cbd5e1;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.route-chip-btn:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.route-chip-btn.active {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(14, 165, 233, 0.25));
+  border-color: #38bdf8;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+}
+
+.route-chip-btn .chip-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+.route-chip-btn .chip-tag.best {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  font-weight: 700;
+}
+
+.route-chip-btn.active .chip-tag {
+  background: #0284c7;
+  color: #fff;
+}
+
+.route-chip-btn.more-btn {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+/* ============================================================
+   路线切换与高德智能算路全功能弹窗
+   ============================================================ */
+.route-switch-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.route-modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(5, 10, 24, 0.85);
+  backdrop-filter: blur(10px);
+}
+
+.route-modal-card {
+  position: relative;
+  z-index: 10;
+  background: #0f172a;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.2);
+  animation: modalPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.92) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.route-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.route-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.route-modal-title .modal-icon {
+  font-size: 26px;
+}
+
+.route-modal-title h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.route-modal-title small {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.btn-close-modal {
+  background: rgba(51, 65, 85, 0.5);
+  border: none;
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-close-modal:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+.route-modal-tabs {
+  display: flex;
+  background: rgba(30, 41, 59, 0.6);
+  padding: 4px;
+  gap: 4px;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.1);
+}
+
+.route-tab-btn {
+  flex: 1;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.route-tab-btn.active {
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+}
+
+.route-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.preset-routes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preset-route-item {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.preset-route-item:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.preset-route-item.active {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+}
+
+.preset-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preset-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.preset-tag.default { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.preset-tag.airport { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+.preset-tag.port { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+.preset-tag.bay { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.preset-tag.live { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+.preset-highway {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.preset-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-od {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #f1f5f9;
+}
+
+.preset-od strong {
+  font-weight: 700;
+}
+
+.preset-od .arrow {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.preset-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.btn-apply-preset {
+  align-self: flex-end;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-route-item.active .btn-apply-preset {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+  font-weight: 700;
+}
+
+.preset-route-item:hover .btn-apply-preset {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+/* 自定义表单样式 */
+.custom-route-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.custom-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.custom-form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.input-with-action {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-action input {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 10px;
+  color: #f8fafc;
+  padding: 10px 14px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-with-action input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+.btn-map-pick {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.btn-map-pick:hover {
+  background: rgba(56, 189, 248, 0.3);
+  border-color: #38bdf8;
+}
+
+.truck-spec-summary {
+  background: rgba(30, 41, 59, 0.6);
+  border-left: 3px solid #38bdf8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.btn-submit-custom-route {
+  margin-top: 6px;
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.4);
+  transition: all 0.2s;
+}
+
+.btn-submit-custom-route:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+
+

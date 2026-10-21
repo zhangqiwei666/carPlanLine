@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AMap v2.0 Rotation Test</title>
+  <style>
+    body, html, #mapContainer { width: 100%; height: 100%; margin: 0; padding: 0; }
+  </style>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=1b5afcd4182988278fda8e81237b07d9"></script>
+</head>
+<body>
+  <div id="mapContainer"></div>
+  <script>
+    window.onload = function() {
+      try {
+        const map = new AMap.Map('mapContainer', {
+          viewMode: '3D',
+          pitch: 35,
+          rotation: -140,
+          zoom: 15,
+          center: [113.5854, 23.0018]
+        });
+        console.log('AMap v2.0 map initialized successfully:', map);
+      } catch (e) {
+        console.error('AMap v2.0 failed:', e);
+      }
+    };
+  </script>
+</body>
+</html>

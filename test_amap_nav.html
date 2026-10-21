@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AMap v2.0 Navigation Test</title>
+  <style>
+    body, html, #mapContainer { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #0f172a; }
+    .nav-vehicle-marker {
+      width: 44px; height: 60px; position: relative;
+    }
+    .vehicle-light-beam {
+      position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
+      width: 48px; height: 50px;
+      background: radial-gradient(ellipse at bottom, rgba(56, 189, 248, 0.6) 0%, rgba(56, 189, 248, 0.15) 50%, transparent 80%);
+      clip-path: polygon(25% 100%, 75% 100%, 100% 0%, 0% 0%);
+      pointer-events: none;
+    }
+  </style>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=1b5afcd4182988278fda8e81237b07d9&plugin=AMap.TruckDriving,AMap.Driving,AMap.Geocoder"></script>
+</head>
+<body>
+  <div id="mapContainer"></div>
+  <script>
+    window.onload = function() {
+      const map = new AMap.Map('mapContainer', {
+        viewMode: '3D',
+        pitch: 40,
+        rotation: -140,
+        zoom: 16,
+        center: [113.5854, 23.0018]
+      });
+
+      // 规划线
+      const lineCoords = [
+        [113.5601, 23.0312],
+        [113.5854, 23.0018],
+        [113.6120, 22.9750],
+        [113.6390, 22.9480]
+      ];
+
+      const polyline = new AMap.Polyline({
+        path: lineCoords,
+        isOutline: true,
+        outlineColor: '#0284c7',
+        borderWeight: 2,
+        strokeColor: '#38bdf8',
+        strokeOpacity: 0.95,
+        strokeWeight: 8,
+        strokeLineJoin: 'round'
+      });
+      map.add(polyline);
+
+      // 车标 (车头永远朝上，因为整个世界旋转了，车头永远指向上方！)
+      const markerContent = `
+        <div class="nav-vehicle-marker">
+          <div class="vehicle-light-beam"></div>
+          <svg viewBox="0 0 40 60" style="width:100%;height:100%;">
+            <rect x="8" y="14" width="24" height="42" rx="4" fill="#0284c7" stroke="#38bdf8" stroke-width="2"/>
+            <rect x="11" y="18" width="18" height="14" rx="2" fill="#0369a1"/>
+            <path d="M11 16 L29 16 L27 10 L13 10 Z" fill="#7dd3fc"/>
+            <rect x="13" y="6" width="14" height="4" rx="1" fill="#0284c7"/>
+            <ellipse cx="11" cy="7" rx="2" ry="1.5" fill="#fef08a"/>
+            <ellipse cx="29" cy="7" rx="2" ry="1.5" fill="#fef08a"/>
+            <polygon points="20,1 26,10 14,10" fill="#38bdf8"/>
+          </svg>
+        </div>
+      `;
+
+      const marker = new AMap.Marker({
+        position: [113.5854, 23.0018],
+        content: markerContent,
+        offset: new AMap.Pixel(-22, -30),
+        angle: 0
+      });
+      map.add(marker);
+    };
+  </script>
+</body>
+</html>
