@@ -1401,33 +1401,183 @@ document.addEventListener('DOMContentLoaded', () => {
     closeRouteSwitchModal();
   }
 
-  // 路线偏好 (权重与策略) 切换函数
+  // 货车路线偏好 (支持组合多选，完整覆盖高德 v4/direction/truck 官方 strategy 1~13)
+  let selectedPrefTags = new Set(['default']);
+  let currentTruckStrategyInfo = {
+    code: '11',
+    name: '高德推荐',
+    desc: '11, 高德推荐：考虑路况，躲避拥堵、速度优先及避免收费（对应SDK策略10）'
+  };
+
+  function computeTruckStrategyFromTags(tags) {
+    if (tags.has('distance_first')) {
+      return {
+        code: '13',
+        name: '不考虑路况距离优先',
+        desc: '13, 不考虑路况距离优先：不考虑当前路况，按道路里程最短规划路径'
+      };
+    }
+    if (tags.has('no_traffic_speed')) {
+      if (tags.has('avoid_highway')) {
+        return {
+          code: '12',
+          name: '无路况+不走高速',
+          desc: '12, 无路况+不走高速：基于历史通行速度数据，不考虑路况且不走高速路线'
+        };
+      }
+      return {
+        code: '10',
+        name: '无路况速度优先',
+        desc: '10, 无路况速度优先：基于历史通行速度数据，不考虑当前路况，返回速度优先路线'
+      };
+    }
+
+    const cg = tags.has('avoid_congestion');
+    const nh = tags.has('avoid_highway');
+    const nt = tags.has('avoid_toll');
+    const hf = tags.has('highway_first');
+
+    if (cg && nt && nh) {
+      return {
+        code: '7',
+        name: '躲避拥堵+避免收费+不走高速',
+        desc: '7, 躲避拥堵+避免收费+不走高速：考虑路况躲避拥堵，规划低收费且不走高速（对应SDK策略18）'
+      };
+    }
+    if (cg && nh) {
+      return {
+        code: '4',
+        name: '躲避拥堵+不走高速',
+        desc: '4, 躲避拥堵+不走高速：考虑路况尽量躲避拥堵，并且不走高速（对应SDK策略15）'
+      };
+    }
+    if (nt && nh) {
+      return {
+        code: '5',
+        name: '避免收费+不走高速',
+        desc: '5, 避免收费+不走高速：考虑路况尽量不走高速，且规划收费较低或免费路径（对应SDK策略16）'
+      };
+    }
+    if (cg && nt) {
+      return {
+        code: '6',
+        name: '躲避拥堵+避免收费',
+        desc: '6, 躲避拥堵+避免收费：考虑路况尽量躲避拥堵，且规划收费较低或免费路径（对应SDK策略17）'
+      };
+    }
+    if (cg && hf) {
+      return {
+        code: '9',
+        name: '躲避拥堵+高速优先',
+        desc: '9, 躲避拥堵+高速优先：优先考虑高速路，并且考虑路况躲避拥堵（对应SDK策略20）'
+      };
+    }
+    if (cg) {
+      return {
+        code: '1',
+        name: '躲避拥堵',
+        desc: '1, 躲避拥堵：返回结果考虑路况，尽量躲避拥堵而规划路径（对应SDK策略12）'
+      };
+    }
+    if (nh) {
+      return {
+        code: '2',
+        name: '不走高速',
+        desc: '2, 不走高速：返回结果考虑路况，不走高速（对应SDK策略13）'
+      };
+    }
+    if (nt) {
+      return {
+        code: '3',
+        name: '避免收费',
+        desc: '3, 避免收费：返回结果考虑路况，尽可能规划收费较低甚至免费的路径（对应SDK策略14）'
+      };
+    }
+    if (hf) {
+      return {
+        code: '8',
+        name: '高速优先',
+        desc: '8, 高速优先：返回结果考虑路况，优先选择高速路（对应SDK策略19）'
+      };
+    }
+    return {
+      code: '11',
+      name: '高德推荐',
+      desc: '11, 高德推荐：考虑路况，躲避拥堵、速度优先及避免收费（对应SDK策略10）'
+    };
+  }
+
   function setRoutePreference(pref) {
     if (!pref) return;
-    currentRoutePreference = pref;
+
+    if (pref === 'default') {
+      selectedPrefTags.clear();
+      selectedPrefTags.add('default');
+    } else if (pref === 'distance_first') {
+      selectedPrefTags.clear();
+      selectedPrefTags.add('distance_first');
+    } else if (pref === 'no_traffic_speed') {
+      selectedPrefTags.delete('default');
+      selectedPrefTags.delete('distance_first');
+      selectedPrefTags.delete('avoid_congestion');
+      selectedPrefTags.delete('avoid_toll');
+      selectedPrefTags.delete('highway_first');
+      if (selectedPrefTags.has('no_traffic_speed')) {
+        selectedPrefTags.delete('no_traffic_speed');
+      } else {
+        selectedPrefTags.add('no_traffic_speed');
+      }
+    } else {
+      selectedPrefTags.delete('default');
+      selectedPrefTags.delete('distance_first');
+      if (pref === 'avoid_congestion' || pref === 'avoid_toll' || pref === 'highway_first') {
+        selectedPrefTags.delete('no_traffic_speed');
+      }
+      if (pref === 'highway_first') {
+        selectedPrefTags.delete('avoid_highway');
+        selectedPrefTags.delete('avoid_toll');
+      } else if (pref === 'avoid_highway' || pref === 'avoid_toll') {
+        selectedPrefTags.delete('highway_first');
+      }
+      if (selectedPrefTags.has(pref)) {
+        selectedPrefTags.delete(pref);
+      } else {
+        selectedPrefTags.add(pref);
+      }
+    }
+
+    if (selectedPrefTags.size === 0) {
+      selectedPrefTags.add('default');
+    }
+
+    currentTruckStrategyInfo = computeTruckStrategyFromTags(selectedPrefTags);
+    currentRoutePreference = currentTruckStrategyInfo.code;
 
     // 同步主面板与弹窗中的激活态
     document.querySelectorAll('.pref-chip-btn').forEach(btn => {
-      if (btn.getAttribute('data-pref') === pref) {
+      const p = btn.getAttribute('data-pref');
+      if (selectedPrefTags.has(p)) {
         btn.classList.add('active');
       } else {
         btn.classList.remove('active');
       }
     });
 
-    const prefNameMap = {
-      'default': '推荐方案',
-      'avoid_congestion': '躲避拥堵',
-      'avoid_highway': '不走高速',
-      'avoid_toll': '少收费',
-      'highway_first': '高速优先'
-    };
-    const prefName = prefNameMap[pref] || pref;
-    appendLog('info', `【偏好策略已切换】当前偏好：【${prefName}】，正在调取高德生成 3 条候选方案...`);
+    // 同步更新顶部策略徽章与官方说明条
+    ['prefStrategyBadgeMain', 'prefStrategyBadgeModal'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `strategy=${currentTruckStrategyInfo.code} · ${currentTruckStrategyInfo.name}`;
+    });
+    ['prefStrategyDescMain', 'prefStrategyDescModal'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = currentTruckStrategyInfo.desc;
+    });
+
+    appendLog('info', `【货车偏好策略已更新】当前策略：strategy=${currentTruckStrategyInfo.code}【${currentTruckStrategyInfo.name}】，正在调取高德货车规划接口...`);
     executeAmapRoutePlanning(false);
   }
 
-  // 统一高德在线规划执行函数 (直接向云端高德拉取 3 条规划路线，支持途经点与路线偏好)
+  // 统一高德在线规划执行函数 (直接向云端高德拉取规划路线，支持途经点与货车 strategy 1~13)
   async function executeAmapRoutePlanning(silent = false) {
     const startInput = document.getElementById('startPointInput');
     const endInput = document.getElementById('endPointInput');
@@ -1451,18 +1601,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnAmap) {
       btnAmap.disabled = true;
-      btnAmap.innerHTML = '<span class="btn-icon">⏳</span> 正在向高德云端规划 3 条路线...';
+      btnAmap.innerHTML = `<span class="btn-icon">⏳</span> 正在按策略 ${currentTruckStrategyInfo.code}(${currentTruckStrategyInfo.name}) 规划路线...`;
     }
 
-    const prefNameMap = {
-      'default': '推荐方案',
-      'avoid_congestion': '躲避拥堵',
-      'avoid_highway': '不走高速',
-      'avoid_toll': '少收费',
-      'highway_first': '高速优先'
-    };
     const viaText = viaPoints.length > 0 ? ` (途径 ${viaPoints.length} 个节点: ${viaPoints.join(' ➔ ')})` : '';
-    appendLog('info', `【高德 API】发起规划: [${startVal}] 到 [${endVal}]${viaText} | 偏好: ${prefNameMap[currentRoutePreference] || '推荐'} | 车型: ${truckParams.length}m长/限高${truckParams.height}m/${truckParams.axis}轴${truckParams.weight}吨...`);
+    appendLog('info', `【高德货车 API】发起规划: [${startVal}] 到 [${endVal}]${viaText} | 策略: strategy=${currentTruckStrategyInfo.code} (${currentTruckStrategyInfo.name}) | 车型: ${truckParams.length}m长/限高${truckParams.height}m/${truckParams.axis}轴${truckParams.weight}吨...`);
 
     try {
       const res = await window.routeEngine.planWithAmapWebApi(
@@ -1471,7 +1614,7 @@ document.addEventListener('DOMContentLoaded', () => {
         truckParams,
         keyVal,
         viaPoints,
-        currentRoutePreference
+        currentTruckStrategyInfo.code
       );
 
       // 重新绘制底图高亮蓝色规划线与动态计算的安全管道缓冲区

@@ -14,7 +14,7 @@
   </script>
   <!-- 引入高德开放平台官方原生 JS API v2.0 WebGL 矢量引擎 -->
   <script src="https://webapi.amap.com/maps?v=2.0&key=c25e742146a48457dc5eefa6688eb5b6&plugin=AMap.TruckDriving,AMap.Driving,AMap.Geocoder,AMap.Traffic"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20261020_v12">
+  <link rel="stylesheet" href="./css/style.css?v=20261111_v30">
 </head>
 <body>
   <div class="app-container">
@@ -179,19 +179,23 @@
             </div>
           </div>
 
-          <!-- 高德路线偏好设置 (权重与策略选择) -->
+          <!-- 高德货车路线偏好设置 (支持多选组合映射官方 strategy 1~13) -->
           <div class="amap-route-preference-box" id="routePreferenceBoxMain">
-            <div class="preference-header" id="prefHeaderMain" title="点击展开/收起路线偏好">
+            <div class="preference-header" id="prefHeaderMain" title="点击展开/收起路线偏好 (支持多选组合)">
               <span class="pref-arrow">▾</span>
-              <span class="pref-title">路线偏好</span>
+              <span class="pref-title">路线偏好 <small style="font-weight:400;opacity:0.75;font-size:10px;">(可多选组合)</small></span>
+              <span class="pref-strategy-badge" id="prefStrategyBadgeMain">strategy=11 · 高德推荐</span>
             </div>
             <div class="preference-chips-wrap" id="prefChipsWrapMain">
-              <button type="button" class="pref-chip-btn active" data-pref="default" title="高德官方推荐最优方案">推荐方案</button>
-              <button type="button" class="pref-chip-btn" data-pref="avoid_congestion" title="优先躲避拥堵路段">躲避拥堵</button>
-              <button type="button" class="pref-chip-btn" data-pref="avoid_highway" title="不走高速公路，全程地面/国道">不走高速</button>
-              <button type="button" class="pref-chip-btn" data-pref="avoid_toll" title="少收费/免过路费优先">少收费</button>
-              <button type="button" class="pref-chip-btn" data-pref="highway_first" title="高速公路优先，通行效率高">高速优先</button>
+              <button type="button" class="pref-chip-btn active" data-pref="default" title="策略11：考虑路况，躲避拥堵、速度优先及避免收费（500Km内返回多条，对应SDK策略10）">高德推荐</button>
+              <button type="button" class="pref-chip-btn" data-pref="avoid_congestion" title="策略1：躲避拥堵（可与不走高速/避免收费/高速优先叠加组合为策略4/6/7/9）">躲避拥堵</button>
+              <button type="button" class="pref-chip-btn" data-pref="avoid_highway" title="策略2：不走高速（可与躲避拥堵/避免收费/无路况叠加组合为策略4/5/7/12）">不走高速</button>
+              <button type="button" class="pref-chip-btn" data-pref="avoid_toll" title="策略3：避免收费（可与躲避拥堵/不走高速叠加组合为策略5/6/7）">避免收费</button>
+              <button type="button" class="pref-chip-btn" data-pref="highway_first" title="策略8：高速优先（可与躲避拥堵叠加组合为策略9）">高速优先</button>
+              <button type="button" class="pref-chip-btn" data-pref="no_traffic_speed" title="策略10：无路况速度优先（可与不走高速叠加组合为策略12）">无路况速度</button>
+              <button type="button" class="pref-chip-btn" data-pref="distance_first" title="策略13：不考虑路况距离优先">距离优先</button>
             </div>
+            <div class="pref-strategy-desc" id="prefStrategyDescMain">11, 高德推荐：考虑路况，躲避拥堵、速度优先及避免收费（对应SDK策略10）</div>
           </div>
 
           <div class="form-grid" style="margin-top: 8px;">
@@ -859,19 +863,23 @@
               </div>
             </div>
 
-            <!-- 弹窗内的路线偏好设置 -->
+            <!-- 弹窗内的路线偏好设置 (支持多选组合映射官方 strategy 1~13) -->
             <div class="amap-route-preference-box in-modal" id="routePreferenceBoxModal">
-              <div class="preference-header" id="prefHeaderModal" title="点击展开/收起路线偏好">
+              <div class="preference-header" id="prefHeaderModal" title="点击展开/收起路线偏好 (支持多选组合)">
                 <span class="pref-arrow">▾</span>
-                <span class="pref-title">路线偏好</span>
+                <span class="pref-title">路线偏好 <small style="font-weight:400;opacity:0.75;font-size:10px;">(可多选组合)</small></span>
+                <span class="pref-strategy-badge" id="prefStrategyBadgeModal">strategy=11 · 高德推荐</span>
               </div>
               <div class="preference-chips-wrap" id="prefChipsWrapModal">
-                <button type="button" class="pref-chip-btn active" data-pref="default" title="高德官方推荐最优方案">推荐方案</button>
-                <button type="button" class="pref-chip-btn" data-pref="avoid_congestion" title="优先躲避拥堵路段">躲避拥堵</button>
-                <button type="button" class="pref-chip-btn" data-pref="avoid_highway" title="不走高速公路，全程地面/国道">不走高速</button>
-                <button type="button" class="pref-chip-btn" data-pref="avoid_toll" title="少收费/免过路费优先">少收费</button>
-                <button type="button" class="pref-chip-btn" data-pref="highway_first" title="高速公路优先，通行效率高">高速优先</button>
+                <button type="button" class="pref-chip-btn active" data-pref="default" title="策略11：考虑路况，躲避拥堵、速度优先及避免收费（500Km内返回多条，对应SDK策略10）">高德推荐</button>
+                <button type="button" class="pref-chip-btn" data-pref="avoid_congestion" title="策略1：躲避拥堵（可与不走高速/避免收费/高速优先叠加组合为策略4/6/7/9）">躲避拥堵</button>
+                <button type="button" class="pref-chip-btn" data-pref="avoid_highway" title="策略2：不走高速（可与躲避拥堵/避免收费/无路况叠加组合为策略4/5/7/12）">不走高速</button>
+                <button type="button" class="pref-chip-btn" data-pref="avoid_toll" title="策略3：避免收费（可与躲避拥堵/不走高速叠加组合为策略5/6/7）">避免收费</button>
+                <button type="button" class="pref-chip-btn" data-pref="highway_first" title="策略8：高速优先（可与躲避拥堵叠加组合为策略9）">高速优先</button>
+                <button type="button" class="pref-chip-btn" data-pref="no_traffic_speed" title="策略10：无路况速度优先（可与不走高速叠加组合为策略12）">无路况速度</button>
+                <button type="button" class="pref-chip-btn" data-pref="distance_first" title="策略13：不考虑路况距离优先">距离优先</button>
               </div>
+              <div class="pref-strategy-desc" id="prefStrategyDescModal">11, 高德推荐：考虑路况，躲避拥堵、速度优先及避免收费（对应SDK策略10）</div>
             </div>
 
             <div class="truck-spec-summary">
@@ -960,14 +968,14 @@
   </div>
 
   <!-- 引入系统各核心业务模块脚本 (附带版本号防止手机浏览器强行缓存旧脚本) -->
-  <script src="./js/audioAlarm.js?v=20261111_v28"></script>
-  <script src="./js/offlineStorage.js?v=20261111_v28"></script>
+  <script src="./js/audioAlarm.js?v=20261111_v31"></script>
+  <script src="./js/offlineStorage.js?v=20261111_v31"></script>
   <!-- 引入高德官方真实道路规划高精坐标串 (同一起终点多路线方案预设与贴地道路节点) -->
-  <script src="./js/sampleRoutesAB.js?v=20261111_v28"></script>
-  <script src="./js/realRouteData.js?v=20261111_v28"></script>
-  <script src="./js/routeEngine.js?v=20261111_v28"></script>
-  <script src="./js/deviationDetector.js?v=20261111_v28"></script>
-  <script src="./js/simulator.js?v=20261111_v28"></script>
-  <script src="./js/app.js?v=20261111_v28"></script>
+  <script src="./js/sampleRoutesAB.js?v=20261111_v31"></script>
+  <script src="./js/realRouteData.js?v=20261111_v31"></script>
+  <script src="./js/routeEngine.js?v=20261111_v31"></script>
+  <script src="./js/deviationDetector.js?v=20261111_v31"></script>
+  <script src="./js/simulator.js?v=20261111_v31"></script>
+  <script src="./js/app.js?v=20261111_v31"></script>
 </body>
 </html>

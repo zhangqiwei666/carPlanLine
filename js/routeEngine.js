@@ -433,76 +433,113 @@ class RoutePlanningEngine {
     let multiPaths = null;
     this.isUsingOfficialTruckApi = false;
 
-    // 高德货车路径规划 (v4/direction/truck) 官方策略码:
-    // 11: 返回多条结果(避让拥堵+速度优先+避免收费，最多3条，同高德地图App默认)
-    // 1: 躲避拥堵 | 2: 不走高速 | 3: 避免收费 | 8: 高速优先
+    // 高德货车路径规划 (v4/direction/truck) 官方策略码 (1~13 完整支持):
+    // 1: 躲避拥堵 | 2: 不走高速 | 3: 避免收费 | 4: 躲避拥堵+不走高速 | 5: 避免收费+不走高速
+    // 6: 躲避拥堵+避免收费 | 7: 躲避拥堵+避免收费+不走高速 | 8: 高速优先 | 9: 躲避拥堵+高速优先
+    // 10: 无路况速度优先 | 11: 高德推荐(500km内多条) | 12: 无路况+不走高速 | 13: 不考虑路况距离优先
     const v4TruckStrategyMap = {
       'default': '11',
       'avoid_congestion': '1',
       'avoid_highway': '2',
       'avoid_toll': '3',
-      'highway_first': '8'
+      'highway_first': '8',
+      'no_traffic_speed': '10',
+      'distance_first': '13'
     };
-    const v4TruckStrategy = v4TruckStrategyMap[this.preference] || '11';
+    const prefStr = String(this.preference || '11');
+    const v4TruckStrategy = (/^(1[0-3]|[1-9])$/.test(prefStr)) ? prefStr : (v4TruckStrategyMap[prefStr] || '11');
+    this.activeTruckStrategyCode = v4TruckStrategy;
 
-    // 高德路径规划 2.0 (v5/direction/driving) 备用策略码
+    // 高德路径规划 2.0 (v5/direction/driving) 备用策略码 (对应 SDK 策略 10~20 -> v5 策略 32~41)
     const v5DriveStrategyMap = {
-      'default': '32',
-      'avoid_congestion': '33',
-      'highway_first': '34',
-      'avoid_highway': '35',
-      'avoid_toll': '36'
+      '11': '32', 'default': '32',
+      '1': '33', 'avoid_congestion': '33',
+      '2': '35', 'avoid_highway': '35',
+      '3': '36', 'avoid_toll': '36',
+      '4': '40',
+      '5': '35',
+      '6': '41',
+      '7': '40',
+      '8': '34', 'highway_first': '34',
+      '9': '39',
+      '10': '38',
+      '12': '35',
+      '13': '32'
     };
-    const v5Strategy = v5DriveStrategyMap[this.preference] || '32';
+    const v5Strategy = v5DriveStrategyMap[v4TruckStrategy] || v5DriveStrategyMap[prefStr] || '32';
 
     const jsSecCode = (window._AMapSecurityConfig && window._AMapSecurityConfig.securityJsCode) || 'c080bcca0b7ded38b6d8cd8e6093946f';
 
     // 1. 直接调取高德官方货车路径规划接口 https://restapi.amap.com/v4/direction/truck
     try {
-      const truckQuery = new URLSearchParams({
-        key: amapKey,
-        origin: origStr,
-        destination: destStr,
-        size: String(this.truckParams.size),
-        height: String(this.truckParams.height),
-        width: String(this.truckParams.width),
-        load: String(this.truckParams.weight), // 车辆总重 (吨)
-        weight: String(Math.max(5, this.truckParams.weight * 0.75).toFixed(1)), // 核定载重 (吨)
-        axis: String(this.truckParams.axis), // 车轴数
-        strategy: v4TruckStrategy
-      });
-      if (amapKey === 'c25e742146a48457dc5eefa6688eb5b6' && jsSecCode) {
-        truckQuery.set('s', 'rsv3');
-        truckQuery.set('jscode', jsSecCode);
-      }
-      if (viaCoords.length > 0) {
-        truckQuery.set('waypoints', viaCoords.map(c => `${c[0].toFixed(6)},${c[1].toFixed(6)}`).join(';'));
-      }
-      const truckUrl = `https://restapi.amap.com/v4/direction/truck?${truckQuery.toString()}`;
-      const truckResp = await fetch(truckUrl);
-      const truckData = await truckResp.json();
+      const fetchTruckStrategy = async (stratCode) => {
+        const truckQuery = new URLSearchParams({
+          key: amapKey,
+          origin: origStr,
+          destination: destStr,
+          size: String(this.truckParams.size),
+          height: String(this.truckParams.height),
+          width: String(this.truckParams.width),
+          load: String(this.truckParams.weight), // 车辆总重 (吨)
+          weight: String(Math.max(5, this.truckParams.weight * 0.75).toFixed(1)), // 核定载重 (吨)
+          axis: String(this.truckParams.axis), // 车轴数
+          strategy: String(stratCode)
+        });
+        if (amapKey === 'c25e742146a48457dc5eefa6688eb5b6' && jsSecCode) {
+          truckQuery.set('s', 'rsv3');
+          truckQuery.set('jscode', jsSecCode);
+        }
+        if (viaCoords.length > 0) {
+          truckQuery.set('waypoints', viaCoords.map(c => `${c[0].toFixed(6)},${c[1].toFixed(6)}`).join(';'));
+        }
+        const truckUrl = `https://restapi.amap.com/v4/direction/truck?${truckQuery.toString()}`;
+        const truckResp = await fetch(truckUrl);
+        const truckData = await truckResp.json();
+        const paths = (truckData && truckData.errcode === 0 && truckData.data && truckData.data.route && truckData.data.route.paths)
+          ? truckData.data.route.paths
+          : ((truckData && truckData.status === '1' && truckData.route && truckData.route.paths) ? truckData.route.paths : null);
+        if (paths && paths.length > 0) {
+          paths.forEach(p => { p._sourceStrategyCode = String(stratCode); });
+        }
+        return { paths, truckData };
+      };
 
-      // v4/direction/truck 标准返回结构: { errcode: 0, errmsg: "OK", data: { route: { paths: [...] } } }
-      const v4Paths = (truckData && truckData.errcode === 0 && truckData.data && truckData.data.route && truckData.data.route.paths)
-        ? truckData.data.route.paths
-        : ((truckData && truckData.status === '1' && truckData.route && truckData.route.paths) ? truckData.route.paths : null);
+      const { paths: v4Paths, truckData } = await fetchTruckStrategy(v4TruckStrategy);
 
       if (v4Paths && v4Paths.length > 0) {
-        const odKey = `${origStr}_${destStr}_${waypointsQueryStr}`;
-        if (v4Paths.length > 1) {
-          this.cachedTruckMultiPaths = { odKey, paths: v4Paths };
-          multiPaths = v4Paths;
-        } else if (this.cachedTruckMultiPaths && this.cachedTruckMultiPaths.odKey === odKey) {
-          // 当选择单路线偏好 (如 strategy=1/2/3/8 只返回1条) 时，从内存合并备选路线保持3条展示，且 0 额外网络请求
-          const primary = v4Paths[0];
-          const others = this.cachedTruckMultiPaths.paths.filter(p => Math.abs(Number(p.distance) - Number(primary.distance)) > 200 || Number(p.tolls) !== Number(primary.tolls));
-          multiPaths = [primary, ...others].slice(0, 3);
-        } else {
-          multiPaths = v4Paths;
+        const mergedPaths = [...v4Paths];
+
+        // 高德官方规则：仅 strategy=11 且在 500Km 以内单次返回多条 (count=3)；
+        // 当超过 500Km 或选择 strategy=1~10,12,13 时单次请求只返回 1 条 (count=1)。
+        // 为保证常に提供最多 3 条真实且不同走向的货车备选方案，自动并发请求互补策略并按里程/收费去重合并：
+        if (mergedPaths.length < 3) {
+          const backupStrategies = ['8', '3', '13', '2', '1'].filter(s => s !== String(v4TruckStrategy));
+          const extraResults = await Promise.all(
+            backupStrategies.slice(0, 3).map(s => fetchTruckStrategy(s).catch(() => ({ paths: null })))
+          );
+          for (const res of extraResults) {
+            if (!res || !res.paths) continue;
+            for (const candPath of res.paths) {
+              if (mergedPaths.length >= 3) break;
+              const candDist = Number(candPath.distance || 0);
+              const candTolls = Number(candPath.tolls || 0);
+              const isDuplicate = mergedPaths.some(existing => {
+                const exDist = Number(existing.distance || 0);
+                const exTolls = Number(existing.tolls || 0);
+                return Math.abs(exDist - candDist) < 800 && Math.abs(exTolls - candTolls) < 5;
+              });
+              if (!isDuplicate) {
+                mergedPaths.push(candPath);
+              }
+            }
+            if (mergedPaths.length >= 3) break;
+          }
         }
+
+        multiPaths = mergedPaths.slice(0, 3);
         path = multiPaths[0];
         this.isUsingOfficialTruckApi = true;
-        engineName = `高德官方货车路径规划引擎 (v4/direction/truck strategy=${v4TruckStrategy})`;
+        engineName = `高德官方货车路径规划引擎 (v4/direction/truck strategy=${v4TruckStrategy} · 共${multiPaths.length}条真实方案)`;
       } else {
         console.warn(`高德 v4/direction/truck 返回提示:`, truckData);
       }
@@ -624,105 +661,89 @@ class RoutePlanningEngine {
       const minDistVal = Math.min(...parsedList.map(i => i.dist));
       const minTollVal = Math.min(...parsedList.map(i => i.tollsNum));
 
-      // 根据用户选择的偏好 (preference) 智能排序候选路线，让最符合当前偏好权重的方案置顶排在方案1
+      // 若调用的是官方货车导航 v4/direction/truck，接口已严格按照 strategy (1~13) 给出顺序，保持原序
       let sortedList = [...parsedList];
-      if (this.preference === 'avoid_toll') {
-        sortedList.sort((a, b) => a.tollsNum - b.tollsNum || a.dur - b.dur);
-      } else if (this.preference === 'avoid_congestion') {
-        sortedList.sort((a, b) => a.dur - b.dur || a.dist - b.dist);
-      } else if (this.preference === 'avoid_highway') {
-        sortedList.sort((a, b) => a.tollsNum - b.tollsNum || a.dist - b.dist);
-      } else if (this.preference === 'highway_first') {
-        sortedList.sort((a, b) => b.tollsNum - a.tollsNum || a.dur - b.dur);
+      if (!this.isUsingOfficialTruckApi) {
+        if (this.preference === 'avoid_toll' || this.preference === '3') {
+          sortedList.sort((a, b) => a.tollsNum - b.tollsNum || a.dur - b.dur);
+        } else if (this.preference === 'avoid_congestion' || this.preference === '1') {
+          sortedList.sort((a, b) => a.dur - b.dur || a.dist - b.dist);
+        } else if (this.preference === 'avoid_highway' || this.preference === '2') {
+          sortedList.sort((a, b) => a.tollsNum - b.tollsNum || a.dist - b.dist);
+        } else if (this.preference === 'highway_first' || this.preference === '8') {
+          sortedList.sort((a, b) => b.tollsNum - a.tollsNum || a.dur - b.dur);
+        }
       }
+
+      const truckStrategyLabelMap = {
+        '1': { short: '躲避拥堵', tag: '方案1·躲避拥堵', via: '避堵干线' },
+        '2': { short: '不走高速', tag: '方案1·不走高速', via: '国道地面' },
+        '3': { short: '避免收费', tag: '方案1·避免收费', via: '经济通道' },
+        '4': { short: '避堵+不走高速', tag: '方案1·避堵+不走高速', via: '地面避堵' },
+        '5': { short: '省钱+不走高速', tag: '方案1·省钱+不走高速', via: '免费国道' },
+        '6': { short: '避堵+避免收费', tag: '方案1·避堵+避免收费', via: '经济避堵' },
+        '7': { short: '避堵+省钱+不走高速', tag: '方案1·避堵+省钱+不走高速', via: '地面经济' },
+        '8': { short: '高速优先', tag: '方案1·高速优先', via: '主线高速' },
+        '9': { short: '避堵+高速优先', tag: '方案1·避堵+高速优先', via: '高速避堵' },
+        '10': { short: '无路况速度优先', tag: '方案1·无路况速度优先', via: '历史最快' },
+        '11': { short: '高德推荐', tag: '方案1·高德推荐', via: '综合最优' },
+        '12': { short: '无路况+不走高速', tag: '方案1·无路况+不走高速', via: '地面快速' },
+        '13': { short: '距离优先', tag: '方案1·距离优先', via: '最短里程' }
+      };
 
       // 第三步：根据偏好与真实数据动态赋予符合实际特性的方案名称与标签 (精炼紧凑，小屏幕自适应)
       this.candidateRoutes = sortedList.map((item, idx) => {
-        const { dist, dur, tollsNum, coords } = item;
+        const { dist, dur, tollsNum, coords, p } = item;
         const tolls = String(tollsNum);
 
-        let tag = idx === 0 ? '方案1·推荐' : `方案${idx + 1}·备选`;
-        let via = '备选通道';
+        const activeCode = String(this.activeTruckStrategyCode || this.preference || '11');
+        const pathSourceCode = (p && p._sourceStrategyCode) ? String(p._sourceStrategyCode) : activeCode;
+        const strategyMeta = truckStrategyLabelMap[activeCode] || truckStrategyLabelMap['11'];
+        const pathSourceMeta = truckStrategyLabelMap[pathSourceCode] || strategyMeta;
+        const apiPathStrategy = p && p.strategy ? String(p.strategy).trim() : '';
+
+        let tag = idx === 0 ? strategyMeta.tag : `方案${idx + 1}·备选`;
+        let via = idx === 0 ? strategyMeta.via : '备选通道';
 
         const isCheapest = tollsNum === minTollVal;
         const isShortestDist = Math.abs(dist - minDistVal) < 100 && (sortedList.some(o => o.dist - dist > 3000));
         const isFastest = dur === minDurVal || idx === 0;
 
-        if (this.preference === 'avoid_congestion') {
-          if (idx === 0) {
-            tag = '方案1·避堵首选';
-            via = '主线高速';
-          } else if (idx === 1) {
-            tag = '方案2·高速避堵';
-            via = '绕行高速';
-          } else {
-            tag = '方案3·备选避堵';
-            via = '避堵通道';
-          }
-        } else if (this.preference === 'avoid_toll') {
-          if (idx === 0) {
-            tag = tollsNum === 0 ? '方案1·免过路费' : '方案1·省钱首选';
-            via = tollsNum === 0 ? '地面干线' : '经济通道';
-          } else if (idx === 1) {
-            tag = '方案2·综合避堵';
-            via = '主线高速';
-          } else {
-            tag = '方案3·备选通道';
-            via = '备选干线';
-          }
-        } else if (this.preference === 'avoid_highway') {
-          if (idx === 0) {
-            tag = '方案1·全程地面';
-            via = '国道干线';
-          } else if (idx === 1) {
-            tag = '方案2·城市快速路';
-            via = '快速干线';
-          } else {
-            tag = '方案3·备选地面';
-            via = '地面通道';
-          }
-        } else if (this.preference === 'highway_first') {
-          if (idx === 0) {
-            tag = '方案1·高速直达';
-            via = '主线高速';
-          } else if (idx === 1) {
-            tag = '方案2·高速避堵';
-            via = '绕行高速';
-          } else {
-            tag = '方案3·备选高速';
-            via = '备选通道';
-          }
+        if (sortedList.length === 1) {
+          // 单条返回结果时
+          tag = strategyMeta.tag;
+          via = apiPathStrategy || strategyMeta.via;
         } else {
-          // 默认推荐方案模式
+          // 多条返回结果时 (包括 500Km 以内的 strategy=11，或跨省长途并发互补策略合并的多条真实方案)
           if (idx === 0) {
-            tag = '方案1·推荐';
-            via = isCheapest && isFastest ? '主线高速' : (isFastest ? '主线高速' : '主线推荐');
+            tag = strategyMeta.tag;
+            via = apiPathStrategy || (isFastest ? '综合最优' : strategyMeta.via);
           } else {
-            if (isCheapest && minTollVal < sortedList[0].tollsNum) {
-              tag = minTollVal === 0 ? `方案${idx + 1}·免费` : `方案${idx + 1}·费用最低`;
+            if (pathSourceCode !== activeCode && pathSourceMeta) {
+              tag = `方案${idx + 1}·${pathSourceMeta.short}`;
+              via = apiPathStrategy || pathSourceMeta.via;
+            } else if (apiPathStrategy) {
+              tag = `方案${idx + 1}·${apiPathStrategy}`;
+              via = isCheapest && tollsNum === 0 ? '地面干线' : (isShortestDist ? '短途干线' : '备选干线');
+            } else if (isCheapest && minTollVal < sortedList[0].tollsNum) {
+              tag = minTollVal === 0 ? `方案${idx + 1}·免过路费` : `方案${idx + 1}·费用最低`;
               via = minTollVal === 0 ? '地面干线' : '经济通道';
             } else if (isShortestDist) {
               tag = `方案${idx + 1}·里程最短`;
               via = '绕行干线';
             } else if (tollsNum > sortedList[0].tollsNum) {
-              tag = `方案${idx + 1}·避开拥堵`;
-              via = '绕行通道';
+              tag = `方案${idx + 1}·高速备选`;
+              via = '主线高速';
             } else {
-              tag = `方案${idx + 1}·备选`;
+              tag = `方案${idx + 1}·备选方案`;
               via = '备选通道';
             }
           }
         }
 
         // 若车辆超高 (例如大于 4.0m)，检查是否含有地面限高风险
-        if (h > 4.0) {
-          if (idx === 0) {
-            tag = '方案1·合规';
-            via = `主线专线(限高${h}m)`;
-          } else if (tollsNum === 0 || via.includes('地面')) {
-            tag = `方案${idx + 1}·注意限高`;
-            via = `地面通道(限高${h}m)`;
-          }
+        if (h > 4.0 && (tollsNum === 0 || via.includes('地面'))) {
+          via = `${via}(限高${h}m)`;
         }
 
         const tollDesc = tolls !== '0' ? `，${truckClass}类车(${this.truckParams.axis}轴)预估过路费约 ￥${tolls}` : '，免过路费';
