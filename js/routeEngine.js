@@ -352,26 +352,31 @@ class RoutePlanningEngine {
     }
 
     // 3. 调用高德地理编码 API (支持全国任意地名/道路/仓库)
-    try {
-      const url = `https://restapi.amap.com/v3/geocode/geo?key=${key}&address=${encodeURIComponent(text)}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
-      if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
-        const parts = data.geocodes[0].location.split(',').map(Number);
-        if (parts.length === 2 && !isNaN(parts[0])) {
-          if (this.geocodeCache) this.geocodeCache.set(cacheKey, parts);
-          return parts;
+    const fallbackWebKey = '2a03c474e98264d59d1c7b78a06e8701';
+    const keysToTry = (key && key !== fallbackWebKey) ? [key, fallbackWebKey] : [key || fallbackWebKey];
+
+    for (const k of keysToTry) {
+      try {
+        const url = `https://restapi.amap.com/v3/geocode/geo?key=${k}&address=${encodeURIComponent(text)}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
+          const parts = data.geocodes[0].location.split(',').map(Number);
+          if (parts.length === 2 && !isNaN(parts[0])) {
+            if (this.geocodeCache) this.geocodeCache.set(cacheKey, parts);
+            return parts;
+          }
         }
+      } catch (e) {
+        console.warn('高德地理编码网络异常:', e);
       }
-    } catch (e) {
-      console.warn('高德地理编码网络异常:', e);
     }
 
     throw new Error(`高德地图未能识别地点“${text}”。\n【原因分析】高德地理编码接口需输入真实有效的中文地名（如“深圳北站”、“广州白云机场”）、行政区街道或经纬度坐标，不支持如“${text}”等非地名英文字符。\n【建议操作】\n1. 请输入具体地名（如“深圳市宝安机场”、“东莞松山湖”）或数字坐标；\n2. 或直接点击输入框右侧的【📍】图标，在地图上任意点击即可！`);
   }
 
   /**
-   * 调取高德开放平台 Web 服务 API 完整在线规划 (支持货车专线与避险干线自动自愈)
+   * 调取高德开放平台 Web 服务 API 完整在线规划 (主调 v4/direction/truck 货车路径规划接口)
    */
   async planWithAmapWebApi(originInput, destinationInput, truckParams = {}, amapKey, viaPointsInput = [], preference = 'default') {
     if (!amapKey) {
@@ -424,91 +429,111 @@ class RoutePlanningEngine {
     };
 
     let path = null;
-    let engineName = '高德官方多路径规划引擎 (v3/direction/driving)';
+    let engineName = '高德官方货车路径规划引擎 (v4/direction/truck)';
     let multiPaths = null;
     this.isUsingOfficialTruckApi = false;
 
-    // 路线偏好映射策略
-    const truckStrategyMap = {
-      'default': '1',
-      'avoid_congestion': '2',
-      'avoid_highway': '3',
-      'avoid_toll': '4',
-      'highway_first': '5'
+    // 高德货车路径规划 (v4/direction/truck) 官方策略码:
+    // 11: 返回多条结果(避让拥堵+速度优先+避免收费，最多3条，同高德地图App默认)
+    // 1: 躲避拥堵 | 2: 不走高速 | 3: 避免收费 | 8: 高速优先
+    const v4TruckStrategyMap = {
+      'default': '11',
+      'avoid_congestion': '1',
+      'avoid_highway': '2',
+      'avoid_toll': '3',
+      'highway_first': '8'
     };
-    const tStrategy = truckStrategyMap[this.preference] || '1';
+    const v4TruckStrategy = v4TruckStrategyMap[this.preference] || '11';
 
-    // 高德 v3 驾车策略说明：0~9 只返回 1 条路线；10~20 为多路径策略，最多返回 3 条路线
-    // 10 推荐(躲避拥堵/路程较短/时间最短)  12 躲避拥堵  13 不走高速  14 避免收费  19 高速优先
-    // 全部使用多路径策略，保证一次请求即可拿到 3 条候选路线，无需二次补充请求
-    const driveStrategyMap = {
-      'default': '10',
-      'avoid_congestion': '12',
-      'avoid_highway': '13',
-      'avoid_toll': '14',
-      'highway_first': '19'
+    // 高德路径规划 2.0 (v5/direction/driving) 备用策略码
+    const v5DriveStrategyMap = {
+      'default': '32',
+      'avoid_congestion': '33',
+      'highway_first': '34',
+      'avoid_highway': '35',
+      'avoid_toll': '36'
     };
-    const dStrategy = driveStrategyMap[this.preference] || '10';
+    const v5Strategy = v5DriveStrategyMap[this.preference] || '32';
 
-    // 1. 优先尝试高德货车专用规划接口 v5/direction/truck (若该 Key 已确认无货车接口权限则自动跳过，避免每次产生无效请求)
-    if (!this.truckApiUnsupportedByKey.has(amapKey)) {
-      try {
-        const truckQuery = new URLSearchParams({
-          key: amapKey,
-          origin: origStr,
-          destination: destStr,
-          size: String(this.truckParams.size),
-          height: String(this.truckParams.height),
-          width: String(this.truckParams.width),
-          weight: String(this.truckParams.weight),
-          axis: String(this.truckParams.axis),
-          load: String(Math.max(10, this.truckParams.weight * 0.6).toFixed(1)),
-          strategy: tStrategy,
-          show_fields: 'polyline,cost'
-        });
-        if (viaCoords.length > 0) {
-          truckQuery.set('waypoints', viaCoords.map(c => `${c[0].toFixed(6)},${c[1].toFixed(6)}`).join(';'));
+    const jsSecCode = (window._AMapSecurityConfig && window._AMapSecurityConfig.securityJsCode) || 'c080bcca0b7ded38b6d8cd8e6093946f';
+
+    // 1. 直接调取高德官方货车路径规划接口 https://restapi.amap.com/v4/direction/truck
+    try {
+      const truckQuery = new URLSearchParams({
+        key: amapKey,
+        origin: origStr,
+        destination: destStr,
+        size: String(this.truckParams.size),
+        height: String(this.truckParams.height),
+        width: String(this.truckParams.width),
+        load: String(this.truckParams.weight), // 车辆总重 (吨)
+        weight: String(Math.max(5, this.truckParams.weight * 0.75).toFixed(1)), // 核定载重 (吨)
+        axis: String(this.truckParams.axis), // 车轴数
+        strategy: v4TruckStrategy
+      });
+      if (amapKey === 'c25e742146a48457dc5eefa6688eb5b6' && jsSecCode) {
+        truckQuery.set('s', 'rsv3');
+        truckQuery.set('jscode', jsSecCode);
+      }
+      if (viaCoords.length > 0) {
+        truckQuery.set('waypoints', viaCoords.map(c => `${c[0].toFixed(6)},${c[1].toFixed(6)}`).join(';'));
+      }
+      const truckUrl = `https://restapi.amap.com/v4/direction/truck?${truckQuery.toString()}`;
+      const truckResp = await fetch(truckUrl);
+      const truckData = await truckResp.json();
+
+      // v4/direction/truck 标准返回结构: { errcode: 0, errmsg: "OK", data: { route: { paths: [...] } } }
+      const v4Paths = (truckData && truckData.errcode === 0 && truckData.data && truckData.data.route && truckData.data.route.paths)
+        ? truckData.data.route.paths
+        : ((truckData && truckData.status === '1' && truckData.route && truckData.route.paths) ? truckData.route.paths : null);
+
+      if (v4Paths && v4Paths.length > 0) {
+        const odKey = `${origStr}_${destStr}_${waypointsQueryStr}`;
+        if (v4Paths.length > 1) {
+          this.cachedTruckMultiPaths = { odKey, paths: v4Paths };
+          multiPaths = v4Paths;
+        } else if (this.cachedTruckMultiPaths && this.cachedTruckMultiPaths.odKey === odKey) {
+          // 当选择单路线偏好 (如 strategy=1/2/3/8 只返回1条) 时，从内存合并备选路线保持3条展示，且 0 额外网络请求
+          const primary = v4Paths[0];
+          const others = this.cachedTruckMultiPaths.paths.filter(p => Math.abs(Number(p.distance) - Number(primary.distance)) > 200 || Number(p.tolls) !== Number(primary.tolls));
+          multiPaths = [primary, ...others].slice(0, 3);
+        } else {
+          multiPaths = v4Paths;
         }
-        const truckResp = await fetch(`https://restapi.amap.com/v5/direction/truck?${truckQuery.toString()}`);
-        const truckData = await truckResp.json();
-        if (truckData.status === '1' && truckData.route && truckData.route.paths && truckData.route.paths.length > 0) {
-          multiPaths = truckData.route.paths;
-          path = multiPaths[0];
-          this.isUsingOfficialTruckApi = true;
-          engineName = `高德货车合规专用引擎 (v5 strategy=${tStrategy})`;
-        } else if (truckData.infocode && truckData.infocode !== '10000') {
-          // 记录该 Key 未开通 v5 货车专项权限，后续算路直接走 v3 多路径引擎，不再产生多余的失败请求
-          this.truckApiUnsupportedByKey.add(amapKey);
-        }
-      } catch (e) {}
+        path = multiPaths[0];
+        this.isUsingOfficialTruckApi = true;
+        engineName = `高德官方货车路径规划引擎 (v4/direction/truck strategy=${v4TruckStrategy})`;
+      } else {
+        console.warn(`高德 v4/direction/truck 返回提示:`, truckData);
+      }
+    } catch (e) {
+      console.warn('调用高德 v4/direction/truck 异常:', e);
     }
 
-    // 2. 若货车接口未单独授权，调用高德官方多策略避险引擎 (返回3条云端备选路线，支持 waypoints)
+    // 2. 若 v4/direction/truck 返回未授权 (errcode: 10012)，自动使用 v5/direction/driving 兜底渲染地图路线
     if (!multiPaths || multiPaths.length === 0) {
-      try {
-        const driveUrl = `https://restapi.amap.com/v3/direction/driving?key=${amapKey}&origin=${origStr}&destination=${destStr}&strategy=${dStrategy}&extensions=base${waypointsQueryStr}`;
-        const driveResp = await fetch(driveUrl);
-        const driveData = await driveResp.json();
-        if (driveData.status === '1' && driveData.route && driveData.route.paths && driveData.route.paths.length > 0) {
-          multiPaths = driveData.route.paths;
-          path = multiPaths[0];
-          engineName = `高德多路径规划引擎 (v3 strategy=${dStrategy} · JT/T 489货车车型换算)`;
-        } else {
-          throw new Error(`高德 API 返回错误: [${driveData.infocode || ''}] ${driveData.info || '未规划出路线'}`);
-        }
-      } catch (err) {
-        // 若指定策略异常，尝试官方多路径接口
-        console.warn('高德指定策略接口异常，尝试推荐多路径接口:', err);
-        const singleUrl = `https://restapi.amap.com/v3/direction/driving?key=${amapKey}&origin=${origStr}&destination=${destStr}&strategy=10&extensions=base${waypointsQueryStr}`;
-        const sResp = await fetch(singleUrl);
-        const sData = await sResp.json();
-        if (sData.status === '1' && sData.route && sData.route.paths && sData.route.paths.length > 0) {
-          multiPaths = sData.route.paths;
-          path = multiPaths[0];
-        } else {
-          throw err;
+      const fallbackWebKey = '2a03c474e98264d59d1c7b78a06e8701';
+      const driveKeys = (amapKey && amapKey !== fallbackWebKey) ? [amapKey, fallbackWebKey] : [amapKey || fallbackWebKey];
+      for (const k of driveKeys) {
+        try {
+          const jsSuffix = (k === 'c25e742146a48457dc5eefa6688eb5b6' && jsSecCode) ? `&s=rsv3&jscode=${jsSecCode}` : '';
+          const v5Url = `https://restapi.amap.com/v5/direction/driving?key=${k}${jsSuffix}&origin=${origStr}&destination=${destStr}&strategy=${v5Strategy}&show_fields=cost,polyline,navi${waypointsQueryStr}`;
+          const v5Resp = await fetch(v5Url);
+          const v5Data = await v5Resp.json();
+          if (v5Data.status === '1' && v5Data.route && v5Data.route.paths && v5Data.route.paths.length > 0) {
+            multiPaths = v5Data.route.paths;
+            path = multiPaths[0];
+            engineName = `高德路径规划 2.0 引擎 (v5/direction/driving strategy=${v5Strategy})`;
+            break;
+          }
+        } catch (err) {
+          console.warn('高德 v5 路径规划异常:', err);
         }
       }
+    }
+
+    if (!multiPaths || multiPaths.length === 0) {
+      throw new Error('高德 API 未能返回有效路径，请检查输入的 API Key 与起终点。');
     }
 
     this.startName = typeof originInput === 'string' ? originInput : `起点 (${origin[0].toFixed(3)}, ${origin[1].toFixed(3)})`;

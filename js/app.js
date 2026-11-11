@@ -237,12 +237,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 实际行驶走过的轨迹线 (绿色代表正常，红色代表偏离)
     actualTrackLayer = new AMap.Polyline({
-      path: [],
+      path: [startCoord, startCoord],
       strokeColor: '#10b981',
       strokeOpacity: 0.9,
       strokeWeight: 6,
       strokeLineJoin: 'round'
     });
+    actualTrackLayer.hide();
     map.add(actualTrackLayer);
   }
 
@@ -394,7 +395,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 记录实际行车轨迹
       actualTrackPoints.push([lng, lat]);
-      actualTrackLayer.setPath(actualTrackPoints);
+      if (actualTrackPoints.length >= 2) {
+        actualTrackLayer.setPath(actualTrackPoints);
+        actualTrackLayer.show();
+      }
 
       // 执行点到折线垂线距离判定 (Turf.js)
       const res = window.deviationDetector.check(point, window.routeEngine.getGeoJsonLine(), speed);
@@ -528,7 +532,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 记录实际行进轨迹
     actualTrackPoints.push([lng, lat]);
-    actualTrackLayer.setPath(actualTrackPoints);
+    if (actualTrackPoints.length >= 2) {
+      actualTrackLayer.setPath(actualTrackPoints);
+      actualTrackLayer.show();
+    }
 
     // 航向：优先用手机芯片给出的 heading (行驶中才有效)；
     // 静止或低速时 GPS 漂移会导致方向乱转，此时保持上一次航向不变
@@ -1429,7 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const startVal = (startInput ? startInput.value : '').trim() || '漯河双汇大厦';
     const endVal = (endInput ? endInput.value : '').trim() || '唐山双汇食品有限责任公司';
-    const keyVal = (keyInput ? keyInput.value : '').trim() || '1b5afcd4182988278fda8e81237b07d9';
+    const keyVal = (keyInput ? keyInput.value : '').trim() || '2a03c474e98264d59d1c7b78a06e8701';
 
     // 提取有效途经点
     const viaPoints = viaPointsState.map(v => v.value.trim()).filter(Boolean);
@@ -1481,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentAnimPos = newStart ? [...newStart] : [113.483120, 23.098800];
       currentAnimHeading = 0;
       actualTrackPoints.length = 0;
-      if (actualTrackLayer) actualTrackLayer.setPath([]);
+      if (actualTrackLayer) actualTrackLayer.hide();
       dismissDeviationAlarmUI();
       if (simulator) simulator.reset();
 
@@ -1568,7 +1575,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentAnimPos = [...newStart];
     currentAnimHeading = 0;
     actualTrackPoints.length = 0;
-    actualTrackLayer.setPath([]);
+    if (actualTrackLayer) actualTrackLayer.hide();
     dismissDeviationAlarmUI();
     if (simulator) simulator.reset();
 
@@ -1771,36 +1778,40 @@ document.addEventListener('DOMContentLoaded', () => {
       const roadSegments = [];
 
       if (route.steps && route.steps.length > 0) {
-        // 从高德云端返回的真实 steps 聚合道路
+        // 从高德云端返回的真实 steps 聚合道路 (同时兼容 v5 路径规划2.0 与 v3 字段)
         let curSegment = null;
         route.steps.forEach((step, sIdx) => {
-          let roadName = (step.road || '').trim();
+          let roadName = (step.road_name || step.road || '').trim();
           if (!roadName) {
             const m = (step.instruction || '').match(/沿([^向往途径进入\s,，。]+)/);
             roadName = m ? m[1] : (sIdx === 0 ? '出港/场区道路' : (sIdx >= route.steps.length - 2 ? '目的地引道' : '内部道路/连通道'));
           }
-          const d = Number(step.distance || 0);
+          const d = Number(step.step_distance || step.distance || 0);
+          const actionText = (step.navi && step.navi.action) ? step.navi.action : (step.action || '直行');
+          const lights = step.cost && step.cost.traffic_lights !== undefined ? Number(step.cost.traffic_lights) : 0;
 
           if (!curSegment || curSegment.name !== roadName) {
             curSegment = {
               name: roadName,
               distance: d,
-              action: step.action || '直行',
+              action: actionText,
+              trafficLights: lights,
               substeps: [step.instruction || '沿路前行']
             };
             roadSegments.push(curSegment);
           } else {
             curSegment.distance += d;
+            curSegment.trafficLights += lights;
             curSegment.substeps.push(step.instruction || '沿路前行');
           }
         });
       } else {
         // 离线/静态预设数据下的优雅保底道路段
         const mockRoads = [
-          { name: '起运枢纽大道', distance: Math.round(route.distanceMeters * 0.05), action: '直行', substeps: ['从起运物流中心发车', '右转进入主干集疏运通道'] },
-          { name: '开发大道互通立交', distance: Math.round(route.distanceMeters * 0.08), action: '右转', substeps: ['沿匝道行驶进入收费站', '进入高速公路主干道'] },
-          { name: route.via ? route.via.split('(')[0].trim() : '国家高速主干线', distance: Math.round(route.distanceMeters * 0.72), action: '直行', substeps: ['沿高速主线持续直行巡航', '途经省际交通大动脉', '通过大型枢纽立交'] },
-          { name: '目的地产业园连接道', distance: Math.round(route.distanceMeters * 0.15), action: '靠右', substeps: ['从高速出口下匝道', '沿园区快速路直达目标仓库'] }
+          { name: '起运枢纽大道', distance: Math.round(route.distanceMeters * 0.05), action: '直行', trafficLights: 2, substeps: ['从起运物流中心发车', '右转进入主干集疏运通道'] },
+          { name: '开发大道互通立交', distance: Math.round(route.distanceMeters * 0.08), action: '右转', trafficLights: 1, substeps: ['沿匝道行驶进入收费站', '进入高速公路主干道'] },
+          { name: route.via ? route.via.split('(')[0].trim() : '国家高速主干线', distance: Math.round(route.distanceMeters * 0.72), action: '直行', trafficLights: 0, substeps: ['沿高速主线持续直行巡航', '途经省际交通大动脉', '通过大型枢纽立交'] },
+          { name: '目的地产业园连接道', distance: Math.round(route.distanceMeters * 0.15), action: '靠右', trafficLights: 3, substeps: ['从高速出口下匝道', '沿园区快速路直达目标仓库'] }
         ];
         mockRoads.forEach(r => roadSegments.push(r));
       }
@@ -1820,6 +1831,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const distText = road.distance >= 1000 ? `${(road.distance / 1000).toFixed(1)}公里` : `${road.distance}米`;
         const substepCount = road.substeps.length;
+        const lightsText = `红绿灯${road.trafficLights || 0}个`;
 
         card.innerHTML = `
           <div class="road-item-node">${iconSymbol}</div>
@@ -1827,7 +1839,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="road-name-box">
               <span class="road-name">${road.name}</span>
               <div class="road-meta">
-                <span>${distText}</span>
+                <span>${distText} ${lightsText}</span>
                 <span class="road-meta-tag">${substepCount > 1 ? `${substepCount}段操作` : '畅通直达'}</span>
               </div>
             </div>
@@ -1892,7 +1904,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentAnimPos = [...newStart];
     currentAnimHeading = 0;
     actualTrackPoints.length = 0;
-    actualTrackLayer.setPath([]);
+    if (actualTrackLayer) actualTrackLayer.hide();
     dismissDeviationAlarmUI();
     if (simulator) simulator.reset();
 
@@ -2226,7 +2238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isRealGpsMode) stopRealGpsMode();
     simulator.reset();
     actualTrackPoints.length = 0;
-    if (actualTrackLayer) actualTrackLayer.setPath([]);
+    if (actualTrackLayer) actualTrackLayer.hide();
     dismissDeviationAlarmUI();
     const startCoord = window.routeEngine.highDenseLine[0];
     if (truckMarker && startCoord) truckMarker.setPosition(startCoord);

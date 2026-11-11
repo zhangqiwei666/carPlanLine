@@ -6,8 +6,14 @@
   <title>智能货运路线规划与实时偏航预警系统 Demo</title>
   <!-- 引入 Turf.js 空间分析库 -->
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-  <!-- 引入高德开放平台官方原生 JS API v2.0 WebGL 矢量引擎 (已绑定用户 WebKey: 1b5afcd4182988278fda8e81237b07d9，集成官方实时路况插件) -->
-  <script src="https://webapi.amap.com/maps?v=2.0&key=1b5afcd4182988278fda8e81237b07d9&plugin=AMap.TruckDriving,AMap.Driving,AMap.Geocoder,AMap.Traffic"></script>
+  <!-- 配置高德 JS API v2.0 安全密钥 (与 c25e742146a48457dc5eefa6688eb5b6 配对) -->
+  <script type="text/javascript">
+    window._AMapSecurityConfig = {
+      securityJsCode: 'c080bcca0b7ded38b6d8cd8e6093946f'
+    };
+  </script>
+  <!-- 引入高德开放平台官方原生 JS API v2.0 WebGL 矢量引擎 -->
+  <script src="https://webapi.amap.com/maps?v=2.0&key=c25e742146a48457dc5eefa6688eb5b6&plugin=AMap.TruckDriving,AMap.Driving,AMap.Geocoder,AMap.Traffic"></script>
   <link rel="stylesheet" href="./css/style.css?v=20261020_v12">
 </head>
 <body>
@@ -209,7 +215,7 @@
           </div>
           <div class="form-item" style="margin-top:8px;">
             <label style="font-size:11px; color:#38bdf8;">已授权高德 API Key (可自由更换):</label>
-            <input type="text" id="amapKeyInput" value="1b5afcd4182988278fda8e81237b07d9" style="font-size:11px; padding:6px 8px; font-family:var(--font-mono); color:#4ade80;" />
+            <input type="text" id="amapKeyInput" value="2a03c474e98264d59d1c7b78a06e8701" style="font-size:11px; padding:6px 8px; font-family:var(--font-mono); color:#4ade80;" />
           </div>
           <div class="form-actions" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
             <button class="btn btn-primary" id="btnCallAmapApi" style="background:linear-gradient(135deg, #0284c7, #0ea5e9); font-weight:700;">
@@ -954,14 +960,14 @@
   </div>
 
   <!-- 引入系统各核心业务模块脚本 (附带版本号防止手机浏览器强行缓存旧脚本) -->
-  <script src="./js/audioAlarm.js?v=20261020_v20"></script>
-  <script src="./js/offlineStorage.js?v=20261020_v20"></script>
+  <script src="./js/audioAlarm.js?v=20261111_v28"></script>
+  <script src="./js/offlineStorage.js?v=20261111_v28"></script>
   <!-- 引入高德官方真实道路规划高精坐标串 (同一起终点多路线方案预设与贴地道路节点) -->
-  <script src="./js/sampleRoutesAB.js?v=20261020_v20"></script>
-  <script src="./js/realRouteData.js?v=20261020_v20"></script>
-  <script src="./js/routeEngine.js?v=20261020_v20"></script>
-  <script src="./js/deviationDetector.js?v=20261020_v20"></script>
-  <script src="./js/simulator.js?v=20261020_v20"></script>
-  <script src="./js/app.js?v=20261020_v20"></script>
+  <script src="./js/sampleRoutesAB.js?v=20261111_v28"></script>
+  <script src="./js/realRouteData.js?v=20261111_v28"></script>
+  <script src="./js/routeEngine.js?v=20261111_v28"></script>
+  <script src="./js/deviationDetector.js?v=20261111_v28"></script>
+  <script src="./js/simulator.js?v=20261111_v28"></script>
+  <script src="./js/app.js?v=20261111_v28"></script>
 </body>
 </html>
