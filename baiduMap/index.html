@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <script>
+    // 强制自动规范化末尾斜杠，防止静态服务器将相对路径 ./js/ 错误解析至上级根目录
+    if (window.location.protocol.startsWith('http') && !window.location.pathname.endsWith('/') && !window.location.pathname.endsWith('.html')) {
+      window.location.replace(window.location.pathname + '/' + window.location.search + window.location.hash);
+    }
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>智能货运路线规划与实时偏航预警系统 (百度地图 SDK 专版)</title>
+  <!-- 引入 Turf.js 空间分析库 -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+  <!-- 引入百度地图开放平台 WebGL (BMapGL) 官方原生矢量引擎与样式 -->
+  <link rel="stylesheet" href="https://api.map.baidu.com/res/webgl/10/bmap.css"/>
+  <script src="https://api.map.baidu.com/getscript?type=webgl&v=1.0&ak=09whqfXUN4uBopGVTqxcHOOkgwBV4Ny5"></script>
+  <link rel="stylesheet" href="./css/style.css">
+  <style>
+    /* 百度地图专属细节微调 */
+    .baidu-badge {
+      background: linear-gradient(135deg, #2932e1, #3385ff) !important;
+      color: #fff !important;
+      box-shadow: 0 0 12px rgba(41, 50, 225, 0.45) !important;
+    }
+    .BMap_cpyCtrl, .anchorBL {
+      display: none !important; /* 保持大屏简洁科技感 */
+    }
+    .engine-switch-link {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(14, 165, 233, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      transition: all 0.2s ease;
+    }
+    .engine-switch-link:hover {
+      background: rgba(14, 165, 233, 0.3);
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body class="mode-driver">
+  <div class="app-container">
+    <!-- 顶部科技导航栏 -->
+    <header class="app-header">
+      <div class="header-left">
+        <button class="mobile-menu-toggle" id="btnToggleSidebar" title="展开/收起控制面板">
+          <span>☰</span> 菜单
+        </button>
+        <div class="logo-badge baidu-badge">百度 GL</div>
+        <h1>智能货运在途监控与实时偏航预警系统 <span>(百度地图 SDK 专版 · BD-09)</span></h1>
+      </div>
+      <div class="header-right">
+        <!-- 引擎互切快捷按钮 -->
+        <a href="../index.html" class="engine-switch-link" title="点击返回高德地图 SDK 版本">
+          <span>🔄 切换至高德地图 SDK</span>
+        </a>
+
+        <!-- 核心视图模式切换: 手机司机导航 vs 调度中心大屏 -->
+        <div class="view-mode-tabs">
+          <button class="view-mode-btn active" id="btnModeDriver" title="手机端货车司机真实驾驶导航视图">
+            <span class="icon">📱</span> 手机司机导航
+          </button>
+          <button class="view-mode-btn" id="btnModeDispatch" title="企业调度中心监控与风控全景视图">
+            <span class="icon">🖥️</span> 调度管理大屏
+          </button>
+        </div>
+
+        <!-- 桌面端手机尺寸切换工具条 (只在电脑大屏司机模式下可见) -->
+        <div class="desktop-phone-frame-bar" id="desktopPhoneFrameBar">
+          <button class="frame-opt-btn active" id="btnFrameSim" title="居中显示真实 iPhone 比例手机屏幕">📱 手机尺寸(390×844)</button>
+          <button class="frame-opt-btn" id="btnFrameFull" title="将手机端视图铺满当前整个浏览器窗口">⛶ 铺满窗口</button>
+        </div>
+        <div class="mode-badge-wrap">
+          <span class="mode-tag sim" id="currentModeBadge">🎮 仿真推流模式</span>
+        </div>
+        <div class="system-status">
+          <span class="status-indicator online" id="netStatusDot"></span>
+          <span id="netStatusText">网络正常</span>
+        </div>
+        <div class="vehicle-badge">
+          <span>车辆: </span>
+          <strong id="headerPlate">粤B·8890A</strong>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主体工作区 -->
+    <main class="app-main">
+      <!-- 控制面板遮罩层 (手机端点击收起) -->
+      <div class="mobile-sidebar-backdrop" id="sidebarBackdrop"></div>
+
+      <!-- 左侧：调度规划与智能控制面板 -->
+      <aside class="control-panel" id="controlPanel">
+        <!-- 移动端侧边栏关闭按钮 -->
+        <div class="mobile-sidebar-close">
+          <span>⚙️ 百度地图调度控制台</span>
+          <button id="btnCloseSidebar">✕ 关闭</button>
+        </div>
+
+        <!-- 核心模块 0: 手机真实物理 GPS 模式 (真机实测) -->
+        <div class="panel-card real-gps-card">
+          <div class="card-title">
+            <span class="icon">📱</span>
+            <h3>手机真机实时定位模式</h3>
+            <span class="tag-live">真机实测</span>
+          </div>
+          <div class="real-gps-actions">
+            <button class="btn btn-gps-primary" id="btnRealGpsToggle">
+              <span class="btn-icon">🛰️</span>
+              <div class="btn-text">
+                <strong id="btnRealGpsText">开启手机真实 GPS 定位</strong>
+                <small id="btnRealGpsSub">读取手机芯片真实定位并实时转换 BD-09</small>
+              </div>
+            </button>
+            <div class="gps-sub-actions">
+              <button class="btn btn-sub" id="btnPlanFromCurrentGps" title="自动根据手机当前位置生成 2.5km 测试走廊">
+                <span>🎯 以当前位置生成走廊</span>
+              </button>
+              <button class="btn btn-sub" id="btnCenterGps" title="将地图视角对齐到手机当前坐标">
+                <span>📍 居中跟随手机</span>
+              </button>
+              <button class="btn btn-sub" id="btnResetDemoRoute" title="切回广深演示路线">
+                <span>🛣️ 恢复广深演示路线</span>
+              </button>
+            </div>
+          </div>
+          <!-- 实时手机 GPS 遥测状态 -->
+          <div class="gps-telemetry-box" id="gpsTelemetryBox">
+            <div class="telemetry-row">
+              <span class="lbl">实时坐标 (BD-09):</span>
+              <span class="val" id="realGpsCoord">未连接 (等待开启)</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="lbl">硬件定位精度:</span>
+              <span class="val" id="realGpsAccuracy">--</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="lbl">累计定位更新:</span>
+              <span class="val" id="realGpsUpdateCount">0 次</span>
+            </div>
+            <div class="telemetry-row">
+              <span class="lbl">自动居中跟随:</span>
+              <label class="switch-wrap">
+                <input type="checkbox" id="chkAutoFollow" checked />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 模块1: 货车物理参数与路线规划 (含百度 API 对接) -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">🚛</span>
+            <h3>货车规格与路径规划</h3>
+            <span class="tag-live" style="background:#2932e1; color:#fff;">百度官方 GL 已接入</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-item">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="margin-bottom:0;">起点 (地名/地址/经纬度):</label>
+                <button type="button" class="btn-chip" id="btnPickStartOnMap" title="点击后在地图上点击任意处选定起点">📍 地图选点</button>
+              </div>
+              <input type="text" id="startPointInput" value="广州黄埔港物流中心" placeholder="例: 深圳北站 / 武汉大学 / 114.05, 22.54" />
+            </div>
+            <div class="form-item">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="margin-bottom:0;">目的地 (地名/地址/经纬度):</label>
+                <button type="button" class="btn-chip" id="btnPickEndOnMap" title="点击后在地图上点击任意处选定终点">🎯 地图选点</button>
+              </div>
+              <input type="text" id="endPointInput" value="东莞清溪智能产业园" placeholder="例: 深圳宝安机场 / 东莞松山湖" />
+            </div>
+            <div class="form-item">
+              <label>车长/宽/高 (m)</label>
+              <input type="text" id="truckDimensions" value="13.5 / 3.95 / 4.0" />
+            </div>
+            <div class="form-item">
+              <label>车总重 / 轴数</label>
+              <input type="text" id="truckWeight" value="36.0 吨 / 4 轴" />
+            </div>
+          </div>
+          <div style="font-size:11px; color:#94a3b8; line-height:1.4; margin-top:6px; background:rgba(30,41,59,0.6); padding:6px 10px; border-radius:6px; border-left:3px solid #3385ff;">
+            💡 <b style="color:#e2e8f0;">百度引擎说明:</b> 支持调用百度地图 JS API GL 官方 DrivingRoute 在线规划，也可以点上方【📍 地图选点】在百度地图上直接定位。
+          </div>
+          <!-- 快捷路线样本芯片 -->
+          <div class="setting-shortcuts" style="margin-top:6px;">
+            <button type="button" class="btn-chip" id="btnSample1" title="广州白云机场 至 深圳宝安机场">✈️ 穗深双机场线</button>
+            <button type="button" class="btn-chip" id="btnSample2" title="深圳盐田港 至 东莞凤岗物流园">🚢 盐田港货运线</button>
+            <button type="button" class="btn-chip" id="btnSample3" title="广州黄埔港 至 东莞清溪">🏭 广深高速干线</button>
+          </div>
+          <div class="form-item" style="margin-top:8px;">
+            <label style="font-size:11px; color:#3385ff;">百度地图 API Key (AK):</label>
+            <input type="text" id="baiduKeyInput" value="09whqfXUN4uBopGVTqxcHOOkgwBV4Ny5" style="font-size:11px; padding:6px 8px; font-family:var(--font-mono); color:#4ade80;" />
+          </div>
+          <div class="form-actions" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
+            <button class="btn btn-primary" id="btnCallBaiduApi" style="background:linear-gradient(135deg, #2932e1, #3385ff); font-weight:700;">
+              <span class="btn-icon">📡</span> 调取百度官方 API 实时算路并绘制走廊
+            </button>
+            <button class="btn btn-secondary" id="btnResetToDefaultRoute" style="font-size:12px;">
+              <span class="btn-icon">🛣️</span> 恢复广深演示基线路线
+            </button>
+            <button class="btn btn-secondary" id="btnLaunchBaiduApp">
+              <span class="btn-icon">📲</span> 唤起手机百度地图 App (带参数)
+            </button>
+          </div>
+        </div>
+
+        <!-- 模块2: 偏航判定与安全容差设置 -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">⚙️</span>
+            <h3>偏航判决引擎规则</h3>
+          </div>
+          <div class="rules-settings">
+            <div class="setting-row">
+              <span>管道安全缓冲阈值:</span>
+              <span class="val-display" id="thresholdVal">250 米</span>
+            </div>
+            <input type="range" id="thresholdRange" min="30" max="600" step="10" value="250">
+            <div class="setting-shortcuts">
+              <button class="btn-chip" data-val="30">🚶 30m步行</button>
+              <button class="btn-chip" data-val="80">🛵 80m市区</button>
+              <button class="btn-chip" data-val="250">🚛 250m高速</button>
+            </div>
+            <div class="setting-tip">
+              * 超出该阈值进入判定观察窗（手机步行实测建议选 30~50m）。
+            </div>
+          </div>
+        </div>
+
+        <!-- 模块3: 运行场景仿真控制器 -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">🎮</span>
+            <h3>虚拟仿真演练控制台</h3>
+          </div>
+          <div class="sim-actions-grid">
+            <button class="btn btn-success" id="btnDriveNormal">
+              <span>▶️ 模拟正常行驶</span>
+              <small>沿指定绿色走廊巡航</small>
+            </button>
+            <button class="btn btn-danger" id="btnDriveDeviate">
+              <span>⚠️ 模拟擅自下道偏航</span>
+              <small>脱离路线驶入省道</small>
+            </button>
+            <button class="btn btn-warning" id="btnSimTunnel">
+              <span>🚇 模拟进隧道断网</span>
+              <small>断网暂存, 出隧道补传</small>
+            </button>
+            <button class="btn btn-secondary" id="btnResetSim">
+              <span>🔄 仿真复位重置</span>
+              <small>重置车辆状态</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- 模块4: 实时上传与离线暂存管道 (Store & Forward) -->
+        <div class="panel-card">
+          <div class="card-title">
+            <span class="icon">☁️</span>
+            <h3>实时上传与离线管道 (HTTP/WebSocket)</h3>
+          </div>
+          <div class="buffer-monitor">
+            <div class="buffer-item">
+              <span class="lbl">累计已上报云端:</span>
+              <strong class="count-tag-success" id="uploadedCount">0 次</strong>
+            </div>
+            <div class="buffer-item">
+              <span class="lbl">弱网本地暂存队列:</span>
+              <strong class="count-tag" id="offlineQueueCount">0 条</strong>
+            </div>
+            <div class="buffer-item">
+              <span class="lbl">最近一次上报:</span>
+              <span class="net-tag ok" id="lastUploadTag">就绪</span>
+            </div>
+          </div>
+          <div class="form-item" style="margin-top:8px;">
+            <label style="font-size:11px; color:#3385ff;">业务后端接收接口 URL (选填):</label>
+            <input type="text" id="uploadApiUrlInput" placeholder="留空为前端模拟；填入如 http://192.168.x.x:8080/api/gps" style="font-size:11px; padding:6px 8px; font-family:var(--font-mono);" />
+          </div>
+          <!-- 实时上传数据包抓包监视器 -->
+          <div class="upload-packet-monitor">
+            <div class="packet-title">
+              <span>📡 最近上报云端 Payload</span>
+              <span class="packet-status" id="packetStatus">HTTP 200 OK</span>
+            </div>
+            <pre class="packet-pre" id="uploadPacketJson">{ "status": "等待第一次定位上报..." }</pre>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 中间与右侧：GIS 地图大屏与双端视角 -->
+      <section class="map-view-section">
+        <!-- 百度地图 WebGL 容器 -->
+        <div id="map" class="map-container"></div>
+
+        <!-- 导航视角与罗盘回正浮钮 -->
+        <button class="nav-compass-btn" id="btnToggleHeadingUp" title="点击居中并锁定车辆跟车视角">
+          <span class="compass-needle" id="compassNeedle">🧭</span>
+          <span class="compass-text" id="compassText">锁定跟随</span>
+        </button>
+
+        <!-- 司机导航准备：路线确认卡片 (未开始导航时常驻展示) -->
+        <div class="driver-route-confirm-card" id="driverRouteConfirmCard">
+          <div class="confirm-card-glow"></div>
+          <div class="confirm-card-content">
+            <div class="confirm-badge-row">
+              <span class="task-badge">🛣️ 百度货运走廊已锁定</span>
+              <button class="btn-switch-route primary-pulse" id="btnOpenRouteSwitchModal" title="选择其他货运干线或输入全国任意起终点">
+                <span class="btn-icon">🔄</span>
+                <span>更换路线 / 自定义算路</span>
+              </button>
+              <span class="corridor-badge">安全走廊: ±250m</span>
+            </div>
+            
+            <div class="confirm-od-group clickable" id="confirmOdClickArea" title="点击更换货运路线或搜索新目的地">
+              <div class="od-col">
+                <span class="od-dot start"></span>
+                <div class="od-texts">
+                  <span class="od-lbl">起运地</span>
+                  <strong class="od-val" id="confirmStartPoint">广州黄埔港物流中心</strong>
+                </div>
+              </div>
+              <div class="od-col-mid">
+                <div class="od-arrow-line">➔</div>
+                <div class="od-dist-val" id="confirmRouteDist">102.4 km</div>
+                <div class="od-change-hint">换路线 ❯</div>
+              </div>
+              <div class="od-col">
+                <span class="od-dot end"></span>
+                <div class="od-texts">
+                  <span class="od-lbl">目的地</span>
+                  <strong class="od-val" id="confirmEndPoint">东莞清溪智能产业园</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 同一起终点多方案快捷切换胶囊 (方案一推荐 / 方案二备选 / 方案三备选) -->
+            <div class="candidate-routes-capsules" id="candidateRoutesCapsules">
+              <div class="candidate-capsule active" data-candidate-idx="0">
+                <div class="capsule-tag">推荐</div>
+                <div class="capsule-info">
+                  <span class="capsule-name">方案1·S3沿江高速</span>
+                  <span class="capsule-meta">102km · 约102分 · 过路费￥64</span>
+                </div>
+              </div>
+              <div class="candidate-capsule" data-candidate-idx="1">
+                <div class="capsule-tag alt">备选</div>
+                <div class="capsule-info">
+                  <span class="capsule-name">方案2·萝岗东二环</span>
+                  <span class="capsule-meta">122km · 避开施工 · 约118分</span>
+                </div>
+              </div>
+              <div class="candidate-capsule" data-candidate-idx="2">
+                <div class="capsule-tag alt">备选</div>
+                <div class="capsule-info">
+                  <span class="capsule-name">方案3·广园快速地面</span>
+                  <span class="capsule-meta">98km · 免过路费 · 约140分</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="confirm-meta-row">
+              <div class="meta-item">
+                <span class="icon">⏱️</span>
+                <span>预估耗时: <strong id="confirmDuration">102</strong> 分钟</span>
+              </div>
+              <div class="meta-item">
+                <span class="icon">🚛</span>
+                <span>策略: <strong>百度货运避险</strong></span>
+              </div>
+              <div class="meta-item">
+                <span class="icon">🛡️</span>
+                <span>风控: <strong>电子围栏实时布控</strong></span>
+              </div>
+            </div>
+
+            <div class="confirm-btn-actions">
+              <button class="btn-start-nav-primary" id="btnStartDriverNav">
+                <span class="btn-icon">🚀</span>
+                <span>进入 3D 沉浸式货运导航</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 司机导航进行中 HUD (顶部指引栏 + 偏航声光告警 + 底部仪表盘) -->
+        <div class="driver-nav-hud" id="driverNavHud" style="display:none;">
+          <!-- 顶部转向指引条 (高德/百度沉浸感) -->
+          <div class="nav-hud-top-bar" id="navHudTopBar">
+            <div class="turn-icon-wrap" id="turnIconWrap">
+              <span class="turn-icon" id="turnIcon">⬆️</span>
+            </div>
+            <div class="turn-info">
+              <div class="turn-dist-line">
+                <strong class="turn-dist" id="turnDistance">1.8</strong>
+                <span class="turn-unit">公里后</span>
+                <span class="turn-action" id="turnAction">沿主线平缓前行</span>
+              </div>
+              <div class="turn-next-road" id="turnNextRoad">S33 广深沿江高速 (合规货运干道)</div>
+            </div>
+            <div class="hud-top-right">
+              <span class="speed-limit-circle" id="speedLimitTag">80</span>
+            </div>
+          </div>
+
+          <!-- 偏航紧急声光报警弹层 (仅偏航时亮起闪烁) -->
+          <div class="nav-deviation-alert-banner" id="deviationAlertBanner" style="display:none;">
+            <div class="alert-siren-icon">🚨</div>
+            <div class="alert-texts">
+              <strong class="alert-title">偏航严重超限！请立即回道</strong>
+              <div class="alert-sub" id="deviationAlertSub">偏离距离: <strong>320m</strong> (容差 250m) · 连续 3 次越界</div>
+            </div>
+          </div>
+
+          <!-- 底部驾驶仪表盘 (时速、剩余距离、退出导航) -->
+          <div class="nav-hud-bottom-bar" id="navHudBottomBar">
+            <div class="hud-speed-gauge">
+              <strong class="speed-num" id="hudCurrentSpeed">68</strong>
+              <span class="speed-unit">km/h</span>
+            </div>
+            <div class="hud-trip-stats">
+              <div class="trip-stat-col">
+                <span class="stat-lbl">剩余里程</span>
+                <strong class="stat-val" id="hudRemainDist">84.5 km</strong>
+              </div>
+              <div class="trip-stat-col">
+                <span class="stat-lbl">预计到达</span>
+                <strong class="stat-val" id="hudEta">16:45</strong>
+              </div>
+              <div class="trip-stat-col">
+                <span class="stat-lbl">偏离安全距</span>
+                <strong class="stat-val safe" id="hudOffsetDist">12 米</strong>
+              </div>
+            </div>
+            <div class="hud-actions">
+              <button class="btn-mute" id="btnToggleMute" title="静音/恢复告警语音">
+                <span id="muteIcon">🔊</span>
+              </button>
+              <button class="btn-exit-nav" id="btnStopDriverNav">
+                <span>退出导航</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 司机导航右侧动态全程路况蚯蚓条 (Worm Bar) -->
+        <div class="nav-worm-bar" id="navWormBar" style="display:none;">
+          <div class="worm-bar-container">
+            <div class="worm-end-flag">终</div>
+            <div class="worm-track-wrap" id="wormTrackWrap">
+              <div class="worm-segment smooth" style="bottom: 0%; height: 25%;"></div>
+              <div class="worm-segment slow" style="bottom: 25%; height: 18%;"></div>
+              <div class="worm-segment smooth" style="bottom: 43%; height: 35%;"></div>
+              <div class="worm-segment congested" style="bottom: 78%; height: 12%;"></div>
+              <div class="worm-segment smooth" style="bottom: 90%; height: 10%;"></div>
+              <!-- 车辆在蚯蚓条上的位置指示器 -->
+              <div class="worm-truck-dot" id="wormTruckDot" style="bottom: 0%;">
+                <div class="worm-truck-icon">▲</div>
+              </div>
+            </div>
+            <div class="worm-start-flag">起</div>
+          </div>
+          <div class="worm-meta-text">
+            <span class="worm-dist-label" id="wormRemainKm">102km</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 路线更换与搜索弹窗 (Modal) -->
+  <div class="route-switch-modal" id="routeSwitchModal" style="display:none;">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">🛣️</span>
+          <h3>选择货运干线或自定义起终点</h3>
+        </div>
+        <button class="btn-modal-close" id="btnCloseRouteModal">✕</button>
+      </div>
+
+      <!-- 选项卡切换: 常用干线方案 vs 自定义全国算路 -->
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="tabPresetRoutes">
+          <span>📦 推荐货运干线方案</span>
+        </button>
+        <button class="modal-tab" id="tabCustomRoute">
+          <span>🔍 自定义起终点算路</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 标签页 1: 预设优质货运通道 -->
+        <div class="route-tab-content" id="contentPresetRoutes">
+          <div class="preset-routes-list">
+            <!-- 路线1: 广深高速干线 -->
+            <div class="preset-route-item active" data-route-id="guangzhou_dongguan">
+              <div class="preset-badge-row">
+                <span class="preset-tag hot">推荐通道</span>
+                <span class="preset-highway">S33 广深沿江高速主线 ➔ 清溪</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start">广州黄埔港物流中心</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">东莞清溪智能产业园</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛣️ 102.4 公里</span>
+                  <span>⏱️ 约 102 分钟</span>
+                  <span>💰 货车走廊专线</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" data-route-id="guangzhou_dongguan">当前已选</button>
+            </div>
+
+            <!-- 路线2: 穗深双机场线 -->
+            <div class="preset-route-item" data-route-id="airport_line">
+              <div class="preset-badge-row">
+                <span class="preset-tag">航空物流专线</span>
+                <span class="preset-highway">G4 京港澳高速 ➔ G15 广深高速</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start">广州白云国际机场货站</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">深圳宝安国际机场航空物流园</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛣️ 118.6 公里</span>
+                  <span>⏱️ 约 110 分钟</span>
+                  <span>✈️ 快速货运通道</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" data-route-id="airport_line">切换到此线</button>
+            </div>
+
+            <!-- 路线3: 盐田港海铁联运线 -->
+            <div class="preset-route-item" data-route-id="yantian_fenggang">
+              <div class="preset-badge-row">
+                <span class="preset-tag port">集装箱骨干线</span>
+                <span class="preset-highway">S30 惠深沿海高速 ➔ 武深高速</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start">深圳盐田港国际集装箱码头</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">东莞凤岗深莞物流集散中心</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛣️ 46.2 公里</span>
+                  <span>⏱️ 约 52 分钟</span>
+                  <span>🚢 重载集装箱专用</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" data-route-id="yantian_fenggang">切换到此线</button>
+            </div>
+
+            <!-- 路线4: 手机当前位置实测路线 -->
+            <div class="preset-route-item gps-opt" id="itemPlanFromPhoneGps">
+              <div class="preset-badge-row">
+                <span class="preset-tag live">真机实测</span>
+                <span class="preset-highway">以手机当前物理定位生成 2.5km 测试走廊</span>
+              </div>
+              <div class="preset-main">
+                <div class="preset-od">
+                  <strong class="p-start" id="modalGpsStartText">手机物理 GPS 定位点</strong>
+                  <span class="arrow">➔</span>
+                  <strong class="p-end">实测规划终点</strong>
+                </div>
+                <div class="preset-meta">
+                  <span>🛰️ 实时卫星经纬度 (转换 BD-09)</span>
+                  <span>🎯 步行/真车室外实测推荐</span>
+                </div>
+              </div>
+              <button class="btn-apply-preset" id="btnModalApplyGps">以此定位测试</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 标签页 2: 自定义全国起终点输入 -->
+        <div class="route-tab-content" id="contentCustomRoute" style="display:none;">
+          <div class="custom-route-form">
+            <div class="custom-form-group">
+              <label>起运地 (支持全国城市/地名/路名/坐标):</label>
+              <div class="input-with-action">
+                <input type="text" id="modalStartInput" placeholder="例: 深圳北站 / 广州白云机场 / 广州塔" value="广州黄埔港物流中心" />
+                <button type="button" class="btn-map-pick" id="btnModalPickStart">📍 点选</button>
+              </div>
+            </div>
+
+            <div class="custom-form-group">
+              <label>目的地 (支持全国城市/地名/路名/坐标):</label>
+              <div class="input-with-action">
+                <input type="text" id="modalEndInput" placeholder="例: 东莞松山湖 / 上海洋山港 / 深圳宝安机场" value="东莞清溪智能产业园" />
+                <button type="button" class="btn-map-pick" id="btnModalPickEnd">🎯 点选</button>
+              </div>
+            </div>
+
+            <div class="truck-spec-summary">
+              <span>🚛 货车参数: 13.5m半挂车 · 4轴36吨 · 限高4.0米 (百度合规策略自动避险)</span>
+            </div>
+
+            <button class="btn-submit-custom-route" id="btnModalSubmitRoute">
+              <span class="btn-icon">📡</span>
+              <span>调取百度官方 API 智能规划路线并绘制走廊</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入系统各核心业务模块脚本 (自适应基准路径注入，彻底杜绝无末尾斜杠访问时的 404) -->
+  <script>
+    (function() {
+      var p = window.location.pathname;
+      var basePath = './';
+      if (window.location.protocol.startsWith('http') && !p.endsWith('/') && !p.endsWith('.html')) {
+        basePath = p.substring(p.lastIndexOf('/') + 1) + '/';
+      }
+      var scripts = [
+        'js/coordTransform.js',
+        'js/audioAlarm.js',
+        'js/offlineStorage.js',
+        'js/sampleRoutesAB.js',
+        'js/realRouteData.js',
+        'js/baiduEngine.js',
+        'js/deviationDetector.js',
+        'js/simulator.js',
+        'js/app.js'
+      ];
+      function loadNext(i) {
+        if (i >= scripts.length) return;
+        var s = document.createElement('script');
+        s.src = basePath + scripts[i];
+        s.onload = function() { loadNext(i + 1); };
+        s.onerror = function() {
+          console.warn('备用路径加载: ' + scripts[i]);
+          var fallback = document.createElement('script');
+          fallback.src = './' + scripts[i];
+          fallback.onload = function() { loadNext(i + 1); };
+          document.body.appendChild(fallback);
+        };
+        document.body.appendChild(s);
+      }
+      loadNext(0);
+    })();
+  </script>
+</body>
+</html>

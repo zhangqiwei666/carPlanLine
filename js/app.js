@@ -37,6 +37,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let accuracyCircle = null;
   let startMarker = null;
   let endMarker = null;
+  let viaMarkers = [];
+
+  // 途经点 (中间节点) 响应式状态列表: [{ id, value }]
+  let viaPointsState = [{ id: 1, value: '' }];
+
+  // 路线偏好 (权重与策略选择): 'default' | 'avoid_congestion' | 'avoid_highway' | 'avoid_toll' | 'highway_first'
+  let currentRoutePreference = 'default';
 
   const actualTrackPoints = [];
 
@@ -74,6 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (corridorPolygonLayer) map.remove(corridorPolygonLayer);
     if (startMarker) map.remove(startMarker);
     if (endMarker) map.remove(endMarker);
+    if (viaMarkers && viaMarkers.length) {
+      map.remove(viaMarkers);
+      viaMarkers = [];
+    }
 
     const corridorGeoJson = window.routeEngine.getCorridorBuffer(window.deviationDetector.thresholdMeters);
     let polygonCoords = [];
@@ -151,7 +162,23 @@ document.addEventListener('DOMContentLoaded', () => {
       offset: new AMap.Pixel(-13, -13),
       title: `目的地: ${window.routeEngine.endName || '东莞清溪智能产业园'}`
     });
-    map.add([startMarker, endMarker]);
+
+    const markersToAdd = [startMarker, endMarker];
+    if (window.routeEngine.viaPoints && window.routeEngine.viaPoints.length > 0) {
+      window.routeEngine.viaPoints.forEach((coord, idx) => {
+        const name = (window.routeEngine.viaNames && window.routeEngine.viaNames[idx]) || `途经点${idx + 1}`;
+        const vMarker = new AMap.Marker({
+          position: coord,
+          content: `<div class="amap-custom-via-marker" title="途经点${idx + 1}: ${name}">途${idx + 1}</div>`,
+          offset: new AMap.Pixel(-12, -12),
+          title: `途经点${idx + 1}: ${name}`,
+          zIndex: 50
+        });
+        viaMarkers.push(vMarker);
+        markersToAdd.push(vMarker);
+      });
+    }
+    map.add(markersToAdd);
 
     if (document.body.classList.contains('mode-driver') && !isDriverNavActive) {
       map.setFitView([plannedPolylineLayer], false, [60, 35, 260, 35]);
@@ -164,11 +191,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmEnd = document.getElementById('confirmEndPoint');
     const confirmDist = document.getElementById('confirmRouteDist');
     const confirmDur = document.getElementById('confirmDuration');
+    const confirmMid = document.querySelector('.od-col-mid .od-arrow-line');
 
     if (confirmStart) confirmStart.textContent = window.routeEngine.startName || '广州黄埔港物流中心';
     if (confirmEnd) confirmEnd.textContent = window.routeEngine.endName || '东莞清溪智能产业园';
     if (confirmDist) confirmDist.textContent = `${(window.routeEngine.totalDistanceMeters / 1000).toFixed(1)} km`;
     if (confirmDur) confirmDur.textContent = `${Math.round(window.routeEngine.durationSeconds / 60) || 102}`;
+    if (confirmMid) {
+      const vCount = (window.routeEngine.viaPoints && window.routeEngine.viaPoints.length) || 0;
+      confirmMid.textContent = vCount > 0 ? `➔ 经${vCount}个途经点 ➔` : '➔';
+    }
   }
 
   let currentVehicleHeading = 0;
@@ -1200,16 +1232,210 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // 统一高德在线规划执行函数
-  async function executeAmapRoutePlanning() {
+  // 解析前端货车规格输入框 (长/宽/高 及 吨位/轴数)
+  function parseTruckParams() {
+    const dimInput = (document.getElementById('truckDimensions')?.value || '13.5 / 2.55 / 4.0').trim();
+    const weightInput = (document.getElementById('truckWeight')?.value || '36.0 吨 / 6 轴').trim();
+
+    // 提取数字 (支持浮点数)
+    const dimMatches = dimInput.match(/[0-9]+(?:\.[0-9]+)?/g) || [];
+    let length = dimMatches[0] ? parseFloat(dimMatches[0]) : 13.5;
+    let width = dimMatches[1] ? parseFloat(dimMatches[1]) : 2.55;
+    let height = dimMatches[2] ? parseFloat(dimMatches[2]) : 4.0;
+
+    // 若用户仅修改输入了 1 个数值 (例如只填了高度 4.5)
+    if (dimMatches.length === 1) {
+      const v = parseFloat(dimMatches[0]);
+      if (v >= 3.0 && v <= 5.5) height = v;
+      else if (v > 1.5 && v < 3.2) width = v;
+      else if (v > 6.0) length = v;
+    }
+
+    const weightMatches = weightInput.match(/[0-9]+(?:\.[0-9]+)?/g) || [];
+    let weight = weightMatches[0] ? parseFloat(weightMatches[0]) : 36.0;
+    let axis = weightMatches[1] ? parseInt(weightMatches[1], 10) : 6;
+
+    // 智能推断高德货车分类尺寸 (size: 1微型/2轻型/3中型/4重型大件)
+    let size = 4;
+    if (length < 6.0 && weight < 4.5) size = 1;
+    else if (length < 9.0 && weight < 12.0) size = 2;
+    else if (length < 12.0 && weight < 25.0) size = 3;
+    else size = 4;
+
+    return { length, width, height, weight, axis, size };
+  }
+
+  // ============================================================
+  // 高德起终点与多途经点 (中间节点) 响应式管理
+  // ============================================================
+  function renderViaPointsUI() {
+    const containers = [
+      document.getElementById('viaPointsContainerMain'),
+      document.getElementById('viaPointsContainerModal')
+    ].filter(Boolean);
+
+    containers.forEach(container => {
+      container.innerHTML = '';
+      viaPointsState.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'via-point-row';
+        row.setAttribute('data-via-id', item.id);
+
+        row.innerHTML = `
+          <span class="via-dot-icon" title="途经点${index + 1}"></span>
+          <input type="text" class="via-point-input" placeholder="请输入途经点${index + 1}" value="${item.value || ''}" />
+          <div class="via-row-actions">
+            <button type="button" class="btn-input-pin via-pick" title="在地图上点选该途经点">📍</button>
+            <button type="button" class="btn-via-remove" title="删除此途经点">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"></circle>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+              </svg>
+            </button>
+            <span class="via-drag-handle" title="途经点${index + 1}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="7" x2="20" y2="7"></line>
+                <line x1="4" y1="12" x2="20" y2="12"></line>
+                <line x1="4" y1="17" x2="20" y2="17"></line>
+              </svg>
+            </span>
+          </div>
+        `;
+
+        const input = row.querySelector('.via-point-input');
+        input.addEventListener('input', (e) => {
+          item.value = e.target.value;
+          // 同步另外一个容器中相同 id 的输入框
+          containers.forEach(otherC => {
+            if (otherC !== container) {
+              const otherInp = otherC.querySelector(`[data-via-id="${item.id}"] .via-point-input`);
+              if (otherInp && otherInp.value !== e.target.value) {
+                otherInp.value = e.target.value;
+              }
+            }
+          });
+        });
+
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            executeAmapRoutePlanning(false);
+          }
+        });
+
+        // 删除按钮
+        const removeBtn = row.querySelector('.btn-via-remove');
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeViaPoint(item.id);
+        });
+
+        // 地图点选
+        const pickBtn = row.querySelector('.via-pick');
+        pickBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          startMapPickingForVia(item.id, index);
+        });
+
+        container.appendChild(row);
+      });
+    });
+  }
+
+  function addViaPoint(defaultValue = '') {
+    if (viaPointsState.length >= 10) {
+      appendLog('warn', '最多支持添加 10 个途经点');
+      return;
+    }
+    const newId = Date.now() + Math.floor(Math.random() * 1000);
+    viaPointsState.push({ id: newId, value: defaultValue });
+    renderViaPointsUI();
+    // 聚焦新建的输入框
+    setTimeout(() => {
+      const inputs = document.querySelectorAll(`.via-point-row[data-via-id="${newId}"] .via-point-input`);
+      if (inputs.length > 0) inputs[0].focus();
+    }, 50);
+  }
+
+  function removeViaPoint(id) {
+    viaPointsState = viaPointsState.filter(v => v.id !== id);
+    renderViaPointsUI();
+  }
+
+  function swapStartAndEnd() {
+    const startInp = document.getElementById('startPointInput');
+    const endInp = document.getElementById('endPointInput');
+    const modalStartInp = document.getElementById('modalStartInput');
+    const modalEndInp = document.getElementById('modalEndInput');
+
+    const sVal = startInp ? startInp.value : '';
+    const eVal = endInp ? endInp.value : '';
+
+    if (startInp) startInp.value = eVal;
+    if (endInp) endInp.value = sVal;
+    if (modalStartInp) modalStartInp.value = eVal;
+    if (modalEndInp) modalEndInp.value = sVal;
+
+    // 若有多个途经点，反向倒序
+    if (viaPointsState.length > 1) {
+      viaPointsState.reverse();
+      renderViaPointsUI();
+    }
+
+    appendLog('info', '【起终点已互换】正在以此路线重新规划...');
+    executeAmapRoutePlanning(false);
+  }
+
+  function startMapPickingForVia(viaId, viaIndex) {
+    mapPickingTarget = 'VIA_' + viaId;
+    map.getContainer().style.cursor = 'crosshair';
+    appendLog('info', `【地图选点模式】请直接在地图上点击设为【途经点 ${viaIndex + 1}】！`);
+    closeMobileSidebar();
+    closeRouteSwitchModal();
+  }
+
+  // 路线偏好 (权重与策略) 切换函数
+  function setRoutePreference(pref) {
+    if (!pref) return;
+    currentRoutePreference = pref;
+
+    // 同步主面板与弹窗中的激活态
+    document.querySelectorAll('.pref-chip-btn').forEach(btn => {
+      if (btn.getAttribute('data-pref') === pref) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    const prefNameMap = {
+      'default': '推荐方案',
+      'avoid_congestion': '躲避拥堵',
+      'avoid_highway': '不走高速',
+      'avoid_toll': '少收费',
+      'highway_first': '高速优先'
+    };
+    const prefName = prefNameMap[pref] || pref;
+    appendLog('info', `【偏好策略已切换】当前偏好：【${prefName}】，正在调取高德生成 3 条候选方案...`);
+    executeAmapRoutePlanning(false);
+  }
+
+  // 统一高德在线规划执行函数 (直接向云端高德拉取 3 条规划路线，支持途经点与路线偏好)
+  async function executeAmapRoutePlanning(silent = false) {
     const startInput = document.getElementById('startPointInput');
     const endInput = document.getElementById('endPointInput');
     const keyInput = document.getElementById('amapKeyInput');
     const btnAmap = document.getElementById('btnCallAmapApi');
 
-    const startVal = (startInput.value || '').trim() || '广州黄埔港物流中心';
-    const endVal = (endInput.value || '').trim() || '东莞清溪智能产业园';
-    const keyVal = (keyInput.value || '').trim() || '1b5afcd4182988278fda8e81237b07d9';
+    const startVal = (startInput ? startInput.value : '').trim() || '漯河双汇大厦';
+    const endVal = (endInput ? endInput.value : '').trim() || '唐山双汇食品有限责任公司';
+    const keyVal = (keyInput ? keyInput.value : '').trim() || '1b5afcd4182988278fda8e81237b07d9';
+
+    // 提取有效途经点
+    const viaPoints = viaPointsState.map(v => v.value.trim()).filter(Boolean);
+
+    // 实时读取用户在界面输入的最新车身长宽高及吨位轴数
+    const truckParams = parseTruckParams();
 
     const originParam = (startVal.includes('当前位置') || startVal.includes('我的位置')) && lastRealCoord
       ? lastRealCoord
@@ -1218,32 +1444,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnAmap) {
       btnAmap.disabled = true;
-      btnAmap.innerHTML = '<span class="btn-icon">⏳</span> 正在向高德云端规划路线...';
+      btnAmap.innerHTML = '<span class="btn-icon">⏳</span> 正在向高德云端规划 3 条路线...';
     }
 
-    appendLog('info', `【高德 API】正在发起路径规划: 从 [${startVal}] 到 [${endVal}] (车型: 13.5m重卡/4轴/36吨/限高4m)...`);
+    const prefNameMap = {
+      'default': '推荐方案',
+      'avoid_congestion': '躲避拥堵',
+      'avoid_highway': '不走高速',
+      'avoid_toll': '少收费',
+      'highway_first': '高速优先'
+    };
+    const viaText = viaPoints.length > 0 ? ` (途径 ${viaPoints.length} 个节点: ${viaPoints.join(' ➔ ')})` : '';
+    appendLog('info', `【高德 API】发起规划: [${startVal}] 到 [${endVal}]${viaText} | 偏好: ${prefNameMap[currentRoutePreference] || '推荐'} | 车型: ${truckParams.length}m长/限高${truckParams.height}m/${truckParams.axis}轴${truckParams.weight}吨...`);
 
     try {
       const res = await window.routeEngine.planWithAmapWebApi(
         originParam,
         destParam,
-        { height: 4.0, width: 2.55, weight: 36.0, axis: 4, size: 4 },
-        keyVal
+        truckParams,
+        keyVal,
+        viaPoints,
+        currentRoutePreference
       );
 
-      // 重新绘制底图高亮蓝色规划线与 250m 安全管道缓冲区
+      // 重新绘制底图高亮蓝色规划线与动态计算的安全管道缓冲区
       drawBaseRouteAndCorridor();
 
-      // 同步更新司机确认卡片与各 HUD 里程时间文本
+      // 同步更新司机确认卡片与各 HUD 里程时间、车型限高文本
       syncRouteInfoToUI();
 
       // 复位小车到新路线的起点
       const newStart = window.routeEngine.highDenseLine[0];
-      truckMarker.setPosition(newStart);
-      currentAnimPos = [...newStart];
+      if (truckMarker && newStart) {
+        truckMarker.setPosition(newStart);
+      }
+      currentAnimPos = newStart ? [...newStart] : [113.483120, 23.098800];
       currentAnimHeading = 0;
       actualTrackPoints.length = 0;
-      actualTrackLayer.setPath([]);
+      if (actualTrackLayer) actualTrackLayer.setPath([]);
       dismissDeviationAlarmUI();
       if (simulator) simulator.reset();
 
@@ -1254,11 +1492,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
       closeRouteSwitchModal();
       renderRouteCandidateChips();
-      appendLog('success', `【高德在线算路成功】使用引擎: ${res.engine} | 全线里程: ${(res.distanceMeters / 1000).toFixed(1)}公里 | 预估耗时: ${Math.round(res.durationSeconds / 60)}分钟 | 高精道路节点: ${res.pointsCount}个！`);
-      window.audioAlarm.speak(`路线规划成功，全长 ${(res.distanceMeters / 1000).toFixed(1)} 公里，已为您锁定合规货运通道！`);
+      appendLog('success', `【高德合规算路成功】已按车高${truckParams.height}m/重${truckParams.weight}t生成 ${res.candidateCount || 3} 条候选方案 | 推荐线: ${(res.distanceMeters / 1000).toFixed(1)}km | 预估耗时: ${Math.round(res.durationSeconds / 60)}分钟！`);
+      if (!silent && window.audioAlarm && window.audioAlarm.speak) {
+        window.audioAlarm.speak(`路线规划完成，已按${truckParams.length}米、限高${truckParams.height}米货车规格避险，生成 3 条备选路线！`);
+      }
+      return res;
     } catch (err) {
       appendLog('alarm', `【高德 API 失败】${err.message}`);
-      alert(`高德路径规划提示:\n${err.message}\n\n已为您自动保留高德当前基准路线。您也可以点击输入框上方的“📍 地图选点”直接在地图上点击任意两点规划路线！`);
+      if (!silent) {
+        alert(`高德路径规划提示:\n${err.message}\n\n已为您自动保留当前基准路线。您也可以点击输入框上方的“📍 地图选点”直接在地图上点击任意两点规划路线！`);
+      }
+      throw err;
     } finally {
       if (btnAmap) {
         btnAmap.disabled = false;
@@ -1282,6 +1526,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const remTime = document.getElementById('amapRemainingTime');
     const wormStart = document.querySelector('.worm-start-tag');
     const wormEnd = document.querySelector('.worm-end-tag');
+
+    // 动态同步货车参数与限高显示
+    const tp = (window.routeEngine.truckParams) || parseTruckParams();
+    const cTruckSpec = document.getElementById('confirmTruckSpec');
+    const cTruckHeight = document.getElementById('confirmTruckHeight');
+    const modalTruckSpec = document.getElementById('modalTruckSpecSummary');
+
+    if (cTruckSpec) cTruckSpec.textContent = `🚛 ${tp.length}m重卡/${tp.axis}轴/${tp.weight}T`;
+    if (cTruckHeight) {
+      cTruckHeight.textContent = `⚠️ 限高 ${tp.height}m`;
+      cTruckHeight.style.color = tp.height > 4.0 ? '#f87171' : '#f59e0b';
+    }
+    if (modalTruckSpec) {
+      modalTruckSpec.textContent = `🚛 货车参数: ${tp.length}m长车 · ${tp.axis}轴${tp.weight}吨 · 限高${tp.height}米 (高德合规策略自动避险)`;
+    }
 
     if (cStart) cStart.textContent = startName;
     if (cEnd) cEnd.textContent = endName;
@@ -1403,35 +1662,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const titleEl = document.createElement('span');
     titleEl.className = 'choice-title';
-    titleEl.textContent = `方案备选 (${candidates.length}条):`;
+    titleEl.innerHTML = `<span class="title-full">方案备选 (${candidates.length}条):</span><span class="title-short">方案:</span>`;
     container.appendChild(titleEl);
 
     candidates.forEach((route, idx) => {
       const btn = document.createElement('button');
-      btn.className = `route-chip-btn ${idx === activeIdx ? 'active' : ''}`;
+      const isCur = idx === activeIdx;
+      btn.className = `route-chip-btn ${isCur ? 'active' : ''}`;
       btn.setAttribute('data-candidate-index', idx);
       btn.title = route.desc || route.name;
 
       const durMin = Math.round(route.durationSeconds / 60);
-      const durText = durMin >= 60 ? `${Math.floor(durMin / 60)}时${durMin % 60}分` : `${durMin}分`;
-      const tollText = route.tolls && route.tolls !== '0' ? `·￥${route.tolls}` : '·免过路费';
-      const kmText = `${(route.distanceMeters / 1000).toFixed(1)}km`;
+      const durText = durMin >= 60 ? `${Math.floor(durMin / 60)}h${durMin % 60 ? durMin % 60 + 'm' : ''}` : `${durMin}分`;
+      const tollText = route.tolls && route.tolls !== '0' ? `￥${route.tolls}` : '免费';
+      const kmText = `${(route.distanceMeters / 1000).toFixed(0)}km`;
 
       const tagClass = idx === 0 ? 'chip-tag best' : 'chip-tag';
       const tagText = route.tag || `方案${idx + 1}`;
 
+      // 紧凑排版：标签 + 路线核心名 + 关键指标(里程·时间·费用) + 仅在激活项展示详情按钮
       btn.innerHTML = `
         <span class="${tagClass}">${tagText}</span>
-        <span class="chip-name">${route.via || route.name} (${kmText}·${durText}${tollText})</span>
+        <span class="chip-main-info">
+          <strong class="chip-road-name">${route.via || route.name}</strong>
+          <span class="chip-metrics-text">${kmText}·${durText}·${tollText}</span>
+        </span>
+        ${isCur ? '<span class="chip-detail-badge" title="点击查看路线详情与逐段指引">详情 ❯</span>' : ''}
       `;
 
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        // 若点击的是详情徽章或者当前已经选中的方案，直接打开详情弹窗
+        if (e.target.classList.contains('chip-detail-badge') || isCur) {
+          applyCandidateRoute(idx);
+          openRouteDetailModal(idx);
+          return;
+        }
         applyCandidateRoute(idx);
       });
 
       container.appendChild(btn);
     });
+
+    // 右侧功能区：路线详情与换城市快捷入口
+    const detailLinkBtn = document.createElement('button');
+    detailLinkBtn.type = 'button';
+    detailLinkBtn.className = 'route-chip-btn detail-quick-btn';
+    detailLinkBtn.id = 'btnChipQuickDetail';
+    detailLinkBtn.title = '查看当前方案的逐段导航指引与道路分布';
+    detailLinkBtn.innerHTML = '<span>📋 详情 ❯</span>';
+    detailLinkBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openRouteDetailModal(window.routeEngine.activeCandidateIndex || 0);
+    });
+    container.appendChild(detailLinkBtn);
 
     // 换城市 / 更多起终点按钮
     const moreBtn = document.createElement('button');
@@ -1445,6 +1729,152 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     container.appendChild(moreBtn);
   }
+
+  // 打开路线详情弹窗 (高仿高德官方 App 逐段指引与道路聚合面板)
+  function openRouteDetailModal(candidateIdx = 0) {
+    const modal = document.getElementById('routeDetailModal');
+    if (!modal) return;
+
+    const candidates = window.routeEngine.candidateRoutes || [];
+    const route = candidates[candidateIdx] || candidates[0];
+    if (!route) return;
+
+    // 1. 回填方案标题与徽章
+    const titleEl = document.getElementById('detailHeaderTitle');
+    const badgeEl = document.getElementById('detailChipBadge');
+    if (titleEl) titleEl.textContent = `路线详情 · 方案${candidateIdx + 1}`;
+    if (badgeEl) badgeEl.textContent = route.tag || `方案${candidateIdx + 1}`;
+
+    // 2. 回填总里程、预估耗时、过路费
+    const kmEl = document.getElementById('modalDetailKm');
+    const timeEl = document.getElementById('modalDetailTime');
+    const tollsEl = document.getElementById('modalDetailTolls');
+    const distKm = (route.distanceMeters / 1000).toFixed(1);
+    const durMin = Math.round(route.durationSeconds / 60);
+    const timeStr = durMin >= 60 ? `${Math.floor(durMin / 60)}小时${durMin % 60}分` : `${durMin}分钟`;
+    const tollStr = route.tolls && route.tolls !== '0' ? `￥${route.tolls}` : '免费';
+
+    if (kmEl) kmEl.textContent = distKm;
+    if (timeEl) timeEl.textContent = timeStr;
+    if (tollsEl) tollsEl.textContent = tollStr;
+
+    // 3. 回填起点与终点名称
+    const sNameEl = document.getElementById('detailStartName');
+    const eNameEl = document.getElementById('detailEndName');
+    if (sNameEl) sNameEl.textContent = window.routeEngine.startName || '广州黄埔港物流中心';
+    if (eNameEl) eNameEl.textContent = window.routeEngine.endName || '东莞清溪智能产业园';
+
+    // 4. 聚合道路步骤列表 (Road Aggregation)
+    const listContainer = document.getElementById('detailRoadsList');
+    if (listContainer) {
+      listContainer.innerHTML = '';
+      const roadSegments = [];
+
+      if (route.steps && route.steps.length > 0) {
+        // 从高德云端返回的真实 steps 聚合道路
+        let curSegment = null;
+        route.steps.forEach((step, sIdx) => {
+          let roadName = (step.road || '').trim();
+          if (!roadName) {
+            const m = (step.instruction || '').match(/沿([^向往途径进入\s,，。]+)/);
+            roadName = m ? m[1] : (sIdx === 0 ? '出港/场区道路' : (sIdx >= route.steps.length - 2 ? '目的地引道' : '内部道路/连通道'));
+          }
+          const d = Number(step.distance || 0);
+
+          if (!curSegment || curSegment.name !== roadName) {
+            curSegment = {
+              name: roadName,
+              distance: d,
+              action: step.action || '直行',
+              substeps: [step.instruction || '沿路前行']
+            };
+            roadSegments.push(curSegment);
+          } else {
+            curSegment.distance += d;
+            curSegment.substeps.push(step.instruction || '沿路前行');
+          }
+        });
+      } else {
+        // 离线/静态预设数据下的优雅保底道路段
+        const mockRoads = [
+          { name: '起运枢纽大道', distance: Math.round(route.distanceMeters * 0.05), action: '直行', substeps: ['从起运物流中心发车', '右转进入主干集疏运通道'] },
+          { name: '开发大道互通立交', distance: Math.round(route.distanceMeters * 0.08), action: '右转', substeps: ['沿匝道行驶进入收费站', '进入高速公路主干道'] },
+          { name: route.via ? route.via.split('(')[0].trim() : '国家高速主干线', distance: Math.round(route.distanceMeters * 0.72), action: '直行', substeps: ['沿高速主线持续直行巡航', '途经省际交通大动脉', '通过大型枢纽立交'] },
+          { name: '目的地产业园连接道', distance: Math.round(route.distanceMeters * 0.15), action: '靠右', substeps: ['从高速出口下匝道', '沿园区快速路直达目标仓库'] }
+        ];
+        mockRoads.forEach(r => roadSegments.push(r));
+      }
+
+      // 渲染每个道路卡片
+      roadSegments.forEach((road) => {
+        const card = document.createElement('div');
+        card.className = 'road-item-card';
+
+        // 转向图标判定
+        let iconSymbol = '↑';
+        if (road.action.includes('左转')) iconSymbol = '↰';
+        else if (road.action.includes('右转')) iconSymbol = '↱';
+        else if (road.action.includes('环岛')) iconSymbol = '⤹';
+        else if (road.action.includes('靠左')) iconSymbol = '↖';
+        else if (road.action.includes('靠右') || road.action.includes('匝道')) iconSymbol = '↗';
+
+        const distText = road.distance >= 1000 ? `${(road.distance / 1000).toFixed(1)}公里` : `${road.distance}米`;
+        const substepCount = road.substeps.length;
+
+        card.innerHTML = `
+          <div class="road-item-node">${iconSymbol}</div>
+          <div class="road-main-row">
+            <div class="road-name-box">
+              <span class="road-name">${road.name}</span>
+              <div class="road-meta">
+                <span>${distText}</span>
+                <span class="road-meta-tag">${substepCount > 1 ? `${substepCount}段操作` : '畅通直达'}</span>
+              </div>
+            </div>
+            <span class="road-toggle-arrow">▼</span>
+          </div>
+          <div class="road-substeps-list">
+            ${road.substeps.map(s => `<div class="substep-row"><span class="substep-bullet">•</span><span>${s}</span></div>`).join('')}
+          </div>
+        `;
+
+        // 点击手风琴展开查看细分指令
+        card.addEventListener('click', () => {
+          card.classList.toggle('expanded');
+        });
+
+        listContainer.appendChild(card);
+      });
+    }
+
+    // 5. 底部按钮绑定
+    const applyBtn = document.getElementById('btnDetailApplyCurrentRoute');
+    if (applyBtn) {
+      applyBtn.onclick = () => {
+        applyCandidateRoute(candidateIdx);
+        closeRouteDetailModal();
+        window.audioAlarm.speak(`已确认选定${route.name}，开始实时导航！`);
+      };
+    }
+
+    // 显示弹窗
+    modal.style.display = 'flex';
+  }
+
+  // 关闭路线详情弹窗
+  function closeRouteDetailModal() {
+    const modal = document.getElementById('routeDetailModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  // 绑定详情弹窗关闭交互
+  const btnDetailBack = document.getElementById('btnDetailBack');
+  const btnDetailClose = document.getElementById('btnDetailClose');
+  const routeDetailBackdrop = document.getElementById('routeDetailBackdrop');
+
+  if (btnDetailBack) btnDetailBack.addEventListener('click', closeRouteDetailModal);
+  if (btnDetailClose) btnDetailClose.addEventListener('click', closeRouteDetailModal);
+  if (routeDetailBackdrop) routeDetailBackdrop.addEventListener('click', closeRouteDetailModal);
 
   // 选定其中一条路线方案并立即更新导航底图与安全走廊
   function applyCandidateRoute(index) {
@@ -1493,8 +1923,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnModalSubmitRoute = document.getElementById('btnModalSubmitRoute');
   if (btnModalSubmitRoute) {
     btnModalSubmitRoute.addEventListener('click', async () => {
-      const s = document.getElementById('modalStartInput')?.value?.trim() || '广州黄埔港物流中心';
-      const d = document.getElementById('modalEndInput')?.value?.trim() || '东莞清溪智能产业园';
+      const s = document.getElementById('modalStartInput')?.value?.trim() || document.getElementById('startPointInput')?.value?.trim() || '漯河双汇大厦';
+      const d = document.getElementById('modalEndInput')?.value?.trim() || document.getElementById('endPointInput')?.value?.trim() || '唐山双汇食品有限责任公司';
       document.getElementById('startPointInput').value = s;
       document.getElementById('endPointInput').value = d;
       
@@ -1530,27 +1960,124 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // 司机主面板上的“路线详情”按钮点击
+  const btnCardOpenRouteDetail = document.getElementById('btnCardOpenRouteDetail');
+  if (btnCardOpenRouteDetail) {
+    btnCardOpenRouteDetail.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const activeIdx = window.routeEngine.activeCandidateIndex || 0;
+      openRouteDetailModal(activeIdx);
+    });
+  }
+
+  // 方案备选栏上的“📋 详情”快捷按钮点击
+  const btnChipQuickDetail = document.getElementById('btnChipQuickDetail');
+  if (btnChipQuickDetail) {
+    btnChipQuickDetail.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const activeIdx = window.routeEngine.activeCandidateIndex || 0;
+      openRouteDetailModal(activeIdx);
+    });
+  }
+
   // 调取高德官方 API 按钮绑定
   const btnCallAmapApi = document.getElementById('btnCallAmapApi');
   if (btnCallAmapApi) {
-    btnCallAmapApi.addEventListener('click', executeAmapRoutePlanning);
+    btnCallAmapApi.addEventListener('click', () => executeAmapRoutePlanning(false));
   }
 
-  // 绑定回车键一键触发路线计算
-  ['startPointInput', 'endPointInput', 'amapKeyInput'].forEach(id => {
+  // 绑定添加途经点与互换起终点按钮
+  const btnAddViaMain = document.getElementById('btnAddViaMain');
+  if (btnAddViaMain) {
+    btnAddViaMain.addEventListener('click', (e) => {
+      e.stopPropagation();
+      addViaPoint('');
+    });
+  }
+  const btnAddViaModal = document.getElementById('btnAddViaModal');
+  if (btnAddViaModal) {
+    btnAddViaModal.addEventListener('click', (e) => {
+      e.stopPropagation();
+      addViaPoint('');
+    });
+  }
+  const btnSwapMain = document.getElementById('btnSwapMain');
+  if (btnSwapMain) {
+    btnSwapMain.addEventListener('click', (e) => {
+      e.stopPropagation();
+      swapStartAndEnd();
+    });
+  }
+  const btnSwapModal = document.getElementById('btnSwapModal');
+  if (btnSwapModal) {
+    btnSwapModal.addEventListener('click', (e) => {
+      e.stopPropagation();
+      swapStartAndEnd();
+    });
+  }
+
+  // 起终点输入框双向同步 (主面板 <-> 弹窗)
+  const syncInputs = [
+    { main: 'startPointInput', modal: 'modalStartInput' },
+    { main: 'endPointInput', modal: 'modalEndInput' }
+  ];
+  syncInputs.forEach(({ main, modal }) => {
+    const mainEl = document.getElementById(main);
+    const modalEl = document.getElementById(modal);
+    if (mainEl && modalEl) {
+      mainEl.addEventListener('input', () => { modalEl.value = mainEl.value; });
+      modalEl.addEventListener('input', () => { mainEl.value = modalEl.value; });
+    }
+  });
+
+  // 绑定路线偏好按钮点击 (主面板与弹窗)
+  document.querySelectorAll('.pref-chip-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const pref = btn.getAttribute('data-pref');
+      if (pref) setRoutePreference(pref);
+    });
+  });
+
+  // 绑定路线偏好标题折叠/展开
+  ['prefHeaderMain', 'prefHeaderModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const box = el.closest('.amap-route-preference-box');
+        if (box) box.classList.toggle('collapsed');
+      });
+    }
+  });
+
+  // 绑定货车规格与起终点输入框的回车与实时输入监听
+  ['startPointInput', 'endPointInput', 'amapKeyInput', 'truckDimensions', 'truckWeight'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          executeAmapRoutePlanning();
+          executeAmapRoutePlanning(false);
         }
       });
+      // 实时修改长宽高或吨位轴数时，立即重算各方案过路费/耗时并回显至确认卡片、方案栏与地图走廊
+      if (id === 'truckDimensions' || id === 'truckWeight') {
+        el.addEventListener('input', () => {
+          const tp = parseTruckParams();
+          if (window.routeEngine.recalculateCandidatesWithTruckParams) {
+            window.routeEngine.recalculateCandidatesWithTruckParams(tp);
+          }
+          syncRouteInfoToUI();
+          renderRouteCandidateChips();
+          drawBaseRouteAndCorridor();
+        });
+      }
     }
   });
 
-  // 地图点选设置起终点功能
-  let mapPickingTarget = null; // 'START' | 'END' | null
+  // 地图点选设置起终点与途经点功能
+  let mapPickingTarget = null; // 'START' | 'END' | 'VIA_<id>' | null
 
   const btnPickStart = document.getElementById('btnPickStartOnMap');
   if (btnPickStart) {
@@ -1596,6 +2123,19 @@ document.addEventListener('DOMContentLoaded', () => {
       map.getContainer().style.cursor = '';
       appendLog('success', `【已选定终点】[${lng}, ${lat}]，正在自动调取高德计算最新规划路线...`);
       executeAmapRoutePlanning();
+    } else if (mapPickingTarget && mapPickingTarget.startsWith('VIA_')) {
+      const viaId = parseInt(mapPickingTarget.replace('VIA_', ''), 10);
+      const lng = Number(e.lnglat.lng.toFixed(6));
+      const lat = Number(e.lnglat.lat.toFixed(6));
+      const targetItem = viaPointsState.find(v => v.id === viaId);
+      if (targetItem) {
+        targetItem.value = `${lng}, ${lat}`;
+        renderViaPointsUI();
+      }
+      mapPickingTarget = null;
+      map.getContainer().style.cursor = '';
+      appendLog('success', `【已选定途经点】[${lng}, ${lat}]，正在自动调取高德计算最新规划路线...`);
+      executeAmapRoutePlanning();
     }
   });
 
@@ -1636,10 +2176,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btnLaunchAmapApp.addEventListener('click', () => {
       const start = lastRealCoord || window.routeEngine.baseCoordinates[0];
       const end = window.routeEngine.baseCoordinates[window.routeEngine.baseCoordinates.length - 1];
-      const via = [
-        { lng: 113.5854, lat: 23.0018, name: '麻涌特大桥必经卡口' },
-        { lng: 113.7850, lat: 22.8520, name: '虎门互通枢纽' }
-      ];
+      const via = (window.routeEngine.viaPoints && window.routeEngine.viaPoints.length > 0)
+        ? window.routeEngine.viaPoints.map((coord, i) => ({
+            lng: coord[0],
+            lat: coord[1],
+            name: (window.routeEngine.viaNames && window.routeEngine.viaNames[i]) || `途经点${i + 1}`
+          }))
+        : [];
 
       const schemeUrl = window.routeEngine.getAmapAppLaunchUrl(
         start,
@@ -1683,10 +2226,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isRealGpsMode) stopRealGpsMode();
     simulator.reset();
     actualTrackPoints.length = 0;
-    actualTrackLayer.setLatLngs([]);
+    if (actualTrackLayer) actualTrackLayer.setPath([]);
     dismissDeviationAlarmUI();
     const startCoord = window.routeEngine.highDenseLine[0];
-    truckMarker.setLatLng([startCoord[1], startCoord[0]]);
+    if (truckMarker && startCoord) truckMarker.setPosition(startCoord);
     updateHud(0, 0, '就绪待命', false, 'IDLE');
     appendLog('info', '车辆复位完成。');
   });
@@ -2033,9 +2576,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 初始化路线元数据同步至前端卡片
-  syncRouteInfoToUI();
-  renderRouteCandidateChips();
+  // 初始化渲染途经点动态输入列表
+  renderViaPointsUI();
+
+  // 初始化：立即向云端高德拉取最新 3 条规划路线（不再依赖本地数据）
+  executeAmapRoutePlanning(true).catch(err => {
+    console.warn('云端高德多路线加载异常，降级显示本地路线:', err);
+    syncRouteInfoToUI();
+    renderRouteCandidateChips();
+  });
 
   // 默认启动模式进入：手机司机导航模式 (带手机尺寸模拟框)
   setViewMode('DRIVER');

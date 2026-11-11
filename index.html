@@ -22,6 +22,11 @@
         <h1>智能货运在途监控与实时偏航预警系统 <span>(移动端/真机自适应版)</span></h1>
       </div>
       <div class="header-right">
+        <!-- 引擎互切快捷按钮 -->
+        <a href="./baiduMap/" class="engine-switch-link" title="点击切换至百度地图 SDK 版本" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:rgba(41,50,225,0.18); border:1px solid rgba(51,133,255,0.45); color:#60a5fa; font-size:12px; font-weight:600; padding:6px 14px; border-radius:20px; transition:all 0.2s ease;">
+          <span>🔄 切换至百度地图 SDK</span>
+        </a>
+
         <!-- 核心视图模式切换: 手机司机导航 vs 调度中心大屏 -->
         <div class="view-mode-tabs">
           <button class="view-mode-btn active" id="btnModeDriver" title="手机端货车司机真实驾驶导航视图">
@@ -122,28 +127,75 @@
             <h3>货车规格与路径规划</h3>
             <span class="tag-live" style="background:#10b981; color:#fff;">高德官方 API 已接入</span>
           </div>
-          <div class="form-grid">
-            <div class="form-item">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="margin-bottom:0;">起点 (地名/地址/经纬度):</label>
-                <button type="button" class="btn-chip" id="btnPickStartOnMap" title="点击后在地图上点击任意处选定起点">📍 地图选点</button>
+          <!-- 高德经典起终点与多途经点（中间节点）编辑盒 -->
+          <div class="amap-route-box" id="mainRouteBox">
+            <div class="amap-route-box-main">
+              <!-- 左侧纵向时间轴与连接线 -->
+              <div class="route-timeline">
+                <span class="timeline-dot start" title="起点"></span>
+                <div class="timeline-line"></div>
+                <span class="timeline-dot end" title="终点"></span>
               </div>
-              <input type="text" id="startPointInput" value="广州黄埔港物流中心" placeholder="例: 深圳北站 / 武汉大学 / 114.05, 22.54" />
-            </div>
-            <div class="form-item">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="margin-bottom:0;">目的地 (地名/地址/经纬度):</label>
-                <button type="button" class="btn-chip" id="btnPickEndOnMap" title="点击后在地图上点击任意处选定终点">🎯 地图选点</button>
+              
+              <!-- 中间起终点与动态途经点输入流 -->
+              <div class="route-inputs-col">
+                <!-- 起点行 -->
+                <div class="route-input-row start-row">
+                  <input type="text" id="startPointInput" value="漯河双汇大厦" placeholder="请输入起点 (城市/地名/坐标)" />
+                  <button type="button" class="btn-input-pin" id="btnPickStartOnMap" title="在地图上点击拾取起点">📍</button>
+                </div>
+                
+                <!-- 动态途经点容器 -->
+                <div class="via-points-list" id="viaPointsContainerMain"></div>
+                
+                <!-- 终点行 -->
+                <div class="route-input-row end-row">
+                  <input type="text" id="endPointInput" value="唐山双汇食品有限责任公司" placeholder="请输入目的地 (城市/地名/坐标)" />
+                  <button type="button" class="btn-input-pin" id="btnPickEndOnMap" title="在地图上点击拾取终点">🎯</button>
+                </div>
               </div>
-              <input type="text" id="endPointInput" value="东莞清溪智能产业园" placeholder="例: 深圳宝安机场 / 东莞松山湖" />
+              
+              <!-- 右侧快捷操作按钮区：添加途经点(+) 与 互换起终点(⇅) -->
+              <div class="route-actions-col">
+                <button type="button" class="btn-route-action btn-add-via" id="btnAddViaMain" title="添加途经点 (中间节点)">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9.5"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                  </svg>
+                </button>
+                <button type="button" class="btn-route-action btn-swap-od" id="btnSwapMain" title="互换起终点">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
+                  </svg>
+                </button>
+              </div>
             </div>
+          </div>
+
+          <!-- 高德路线偏好设置 (权重与策略选择) -->
+          <div class="amap-route-preference-box" id="routePreferenceBoxMain">
+            <div class="preference-header" id="prefHeaderMain" title="点击展开/收起路线偏好">
+              <span class="pref-arrow">▾</span>
+              <span class="pref-title">路线偏好</span>
+            </div>
+            <div class="preference-chips-wrap" id="prefChipsWrapMain">
+              <button type="button" class="pref-chip-btn active" data-pref="default" title="高德官方推荐最优方案">推荐方案</button>
+              <button type="button" class="pref-chip-btn" data-pref="avoid_congestion" title="优先躲避拥堵路段">躲避拥堵</button>
+              <button type="button" class="pref-chip-btn" data-pref="avoid_highway" title="不走高速公路，全程地面/国道">不走高速</button>
+              <button type="button" class="pref-chip-btn" data-pref="avoid_toll" title="少收费/免过路费优先">少收费</button>
+              <button type="button" class="pref-chip-btn" data-pref="highway_first" title="高速公路优先，通行效率高">高速优先</button>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top: 8px;">
             <div class="form-item">
               <label>车长/宽/高 (m)</label>
               <input type="text" id="truckDimensions" value="13.5 / 2.55 / 4.0" />
             </div>
             <div class="form-item">
               <label>车总重 / 轴数</label>
-              <input type="text" id="truckWeight" value="36.0 吨 / 4 轴" />
+              <input type="text" id="truckWeight" value="36.0 吨 / 6 轴" />
             </div>
           </div>
           <div style="font-size:11px; color:#94a3b8; line-height:1.4; margin-top:6px; background:rgba(30,41,59,0.6); padding:6px 10px; border-radius:6px; border-left:3px solid #38bdf8;">
@@ -277,6 +329,10 @@
                 <span class="btn-icon">🔄</span>
                 <span>更换路线 / 自定义算路</span>
               </button>
+              <button class="btn-switch-route" id="btnCardOpenRouteDetail" title="查看当前导航路线的具体途经路段与转向详情" style="background:rgba(14,165,233,0.16); border-color:#38bdf8; color:#38bdf8;">
+                <span class="btn-icon">📋</span>
+                <span>路线详情</span>
+              </button>
               <span class="corridor-badge">安全走廊: ±250m</span>
             </div>
             
@@ -304,18 +360,31 @@
 
             <!-- 路线方案备选栏：同一起终点 (A ➔ B) 的多种导航方案 (方案1速度最快、方案2避开拥堵、方案3费用最低) -->
             <div class="route-choice-chips-bar" id="routeChoiceChipsBar">
-              <span class="choice-title">方案备选:</span>
+              <span class="choice-title"><span class="title-full">方案备选:</span><span class="title-short">方案:</span></span>
               <button class="route-chip-btn active" data-candidate-index="0" title="走S3沿江高速全程主线，速度最快，红绿灯少">
                 <span class="chip-tag best">方案1·推荐</span>
-                <span class="chip-name">S3广深沿江高速 (111.9km·1时53分·￥64)</span>
+                <span class="chip-main-info">
+                  <strong class="chip-road-name">主线高速</strong>
+                  <span class="chip-metrics-text">112km·1h53m·￥64</span>
+                </span>
+                <span class="chip-detail-badge" title="点击查看路线详情与逐段指引">详情 ❯</span>
               </button>
               <button class="route-chip-btn" data-candidate-index="1" title="绕行萝岗及东二环互通，避开沿江大流量施工">
-                <span class="chip-tag">方案2·避施工</span>
-                <span class="chip-name">萝岗/东二环高速 (122.9km·1时58分·￥71)</span>
+                <span class="chip-tag">方案2·避堵</span>
+                <span class="chip-main-info">
+                  <strong class="chip-road-name">绕行干线</strong>
+                  <span class="chip-metrics-text">123km·1h58m·￥71</span>
+                </span>
               </button>
               <button class="route-chip-btn" data-candidate-index="2" title="经由广园快速路及G107国道地面干线，全程过路费￥0">
-                <span class="chip-tag">方案3·免路费</span>
-                <span class="chip-name">广园快速/地面快线 (101.9km·3时28分·免费)</span>
+                <span class="chip-tag">方案3·免费</span>
+                <span class="chip-main-info">
+                  <strong class="chip-road-name">地面干线</strong>
+                  <span class="chip-metrics-text">102km·3h28m·免费</span>
+                </span>
+              </button>
+              <button class="route-chip-btn detail-quick-btn" id="btnChipQuickDetail" title="查看当前方案的逐段导航指引与道路分布">
+                <span>📋 详情 ❯</span>
               </button>
               <button class="route-chip-btn more-btn" id="btnChipOpenMore" title="打开弹窗切换起终点城市或自定义算路">
                 <span>换城市 ❯</span>
@@ -324,8 +393,8 @@
 
             <div class="confirm-meta-row">
               <span class="meta-item">⏱️ 预估 <strong id="confirmDuration">102</strong> 分钟</span>
-              <span class="meta-item">🚛 13.5m重卡/4轴/36T</span>
-              <span class="meta-item">⚠️ 限高 4.0m</span>
+              <span class="meta-item" id="confirmTruckSpec">🚛 13.5m重卡/6轴/36T</span>
+              <span class="meta-item" id="confirmTruckHeight">⚠️ 限高 4.0m</span>
               <span class="meta-item">📡 偏航实时抓拍</span>
             </div>
 
@@ -745,27 +814,62 @@
           </div>
         </div>
 
-        <!-- 标签页 2: 自定义全国起终点输入 -->
+        <!-- 标签页 2: 自定义全国起终点输入 (支持多途经点) -->
         <div class="route-tab-content" id="contentCustomRoute" style="display:none;">
           <div class="custom-route-form">
-            <div class="custom-form-group">
-              <label>起运地 (支持全国城市/地名/路名/坐标):</label>
-              <div class="input-with-action">
-                <input type="text" id="modalStartInput" placeholder="例: 深圳北站 / 广州白云机场 / 广州塔" value="广州黄埔港物流中心" />
-                <button type="button" class="btn-map-pick" id="btnModalPickStart">📍 点选</button>
+            <!-- 高德原生起终点与途经点编辑卡片 -->
+            <div class="amap-route-box in-modal" id="modalRouteBox">
+              <div class="amap-route-box-main">
+                <div class="route-timeline">
+                  <span class="timeline-dot start" title="起点"></span>
+                  <div class="timeline-line"></div>
+                  <span class="timeline-dot end" title="终点"></span>
+                </div>
+                <div class="route-inputs-col">
+                  <div class="route-input-row start-row">
+                    <input type="text" id="modalStartInput" placeholder="请输入起点 (城市/地名/坐标)" value="漯河双汇大厦" />
+                    <button type="button" class="btn-input-pin" id="btnModalPickStart" title="地图点选起点">📍</button>
+                  </div>
+                  <div class="via-points-list" id="viaPointsContainerModal"></div>
+                  <div class="route-input-row end-row">
+                    <input type="text" id="modalEndInput" placeholder="请输入目的地 (城市/地名/坐标)" value="唐山双汇食品有限责任公司" />
+                    <button type="button" class="btn-input-pin" id="btnModalPickEnd" title="地图点选终点">🎯</button>
+                  </div>
+                </div>
+                <div class="route-actions-col">
+                  <button type="button" class="btn-route-action btn-add-via" id="btnAddViaModal" title="添加途经点 (中间节点)">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="9.5"></circle>
+                      <line x1="12" y1="8" x2="12" y2="16"></line>
+                      <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                  </button>
+                  <button type="button" class="btn-route-action btn-swap-od" id="btnSwapModal" title="互换起终点">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div class="custom-form-group">
-              <label>目的地 (支持全国城市/地名/路名/坐标):</label>
-              <div class="input-with-action">
-                <input type="text" id="modalEndInput" placeholder="例: 东莞松山湖 / 上海洋山港 / 深圳宝安机场" value="东莞清溪智能产业园" />
-                <button type="button" class="btn-map-pick" id="btnModalPickEnd">🎯 点选</button>
+            <!-- 弹窗内的路线偏好设置 -->
+            <div class="amap-route-preference-box in-modal" id="routePreferenceBoxModal">
+              <div class="preference-header" id="prefHeaderModal" title="点击展开/收起路线偏好">
+                <span class="pref-arrow">▾</span>
+                <span class="pref-title">路线偏好</span>
+              </div>
+              <div class="preference-chips-wrap" id="prefChipsWrapModal">
+                <button type="button" class="pref-chip-btn active" data-pref="default" title="高德官方推荐最优方案">推荐方案</button>
+                <button type="button" class="pref-chip-btn" data-pref="avoid_congestion" title="优先躲避拥堵路段">躲避拥堵</button>
+                <button type="button" class="pref-chip-btn" data-pref="avoid_highway" title="不走高速公路，全程地面/国道">不走高速</button>
+                <button type="button" class="pref-chip-btn" data-pref="avoid_toll" title="少收费/免过路费优先">少收费</button>
+                <button type="button" class="pref-chip-btn" data-pref="highway_first" title="高速公路优先，通行效率高">高速优先</button>
               </div>
             </div>
 
             <div class="truck-spec-summary">
-              <span>🚛 货车参数: 13.5m半挂车 · 4轴36吨 · 限高4.0米 (高德合规策略自动避险)</span>
+              <span id="modalTruckSpecSummary">🚛 货车参数: 13.5m半挂车 · 6轴36吨 · 限高4.0米 (高德合规策略自动避险)</span>
             </div>
 
             <button class="btn-submit-custom-route" id="btnModalSubmitRoute">
@@ -774,6 +878,77 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 路线详情模态框 (高仿高德路线详情交互与逐段道路指引) -->
+  <div class="route-detail-modal" id="routeDetailModal" style="display:none;">
+    <div class="route-detail-backdrop" id="routeDetailBackdrop"></div>
+    <div class="route-detail-card" id="routeDetailCard">
+      <!-- 头部标题栏 (带返回箭头) -->
+      <div class="detail-header">
+        <button type="button" class="btn-detail-back" id="btnDetailBack" title="返回/关闭">
+          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="detail-header-text">
+          <h3 id="detailHeaderTitle">路线详情</h3>
+          <span class="detail-chip-badge" id="detailChipBadge">方案1·推荐</span>
+        </div>
+        <button type="button" class="btn-detail-close" id="btnDetailClose" title="关闭详情">✕</button>
+      </div>
+
+      <!-- 方案概览栏 -->
+      <div class="detail-overview-banner">
+        <div class="overview-metric">
+          <span class="metric-num" id="modalDetailKm">--</span>
+          <span class="metric-unit">公里</span>
+        </div>
+        <div class="overview-divider"></div>
+        <div class="overview-metric">
+          <span class="metric-num highlight" id="modalDetailTime">--</span>
+          <span class="metric-unit">预估耗时</span>
+        </div>
+        <div class="overview-divider"></div>
+        <div class="overview-metric">
+          <span class="metric-num" id="modalDetailTolls">--</span>
+          <span class="metric-unit">预估过路费</span>
+        </div>
+      </div>
+
+      <!-- 途经道路与指引列表 -->
+      <div class="detail-scroll-area">
+        <!-- 起点 -->
+        <div class="timeline-endpoint start">
+          <div class="endpoint-circle start">起</div>
+          <div class="endpoint-info">
+            <div class="endpoint-name" id="detailStartName">广州黄埔港物流中心</div>
+            <div class="endpoint-hint">起点出发行驶</div>
+          </div>
+        </div>
+
+        <!-- 聚合道路列表容器 -->
+        <div class="detail-roads-list" id="detailRoadsList">
+          <!-- 动态插入各个主要道路段 -->
+        </div>
+
+        <!-- 终点 -->
+        <div class="timeline-endpoint end">
+          <div class="endpoint-circle end">终</div>
+          <div class="endpoint-info">
+            <div class="endpoint-name" id="detailEndName">东莞清溪智能产业园</div>
+            <div class="endpoint-hint">到达目的地园区</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部确认并导航按钮 -->
+      <div class="detail-footer-actions">
+        <button type="button" class="btn-apply-and-nav" id="btnDetailApplyCurrentRoute">
+          <span>🚀 选定此方案并开始导航</span>
+        </button>
       </div>
     </div>
   </div>

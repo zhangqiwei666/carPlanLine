@@ -209,6 +209,429 @@ body {
   gap: 8px;
 }
 
+/* ============================================================
+   高德官方原生风：起终点与多途经点（中间节点）编辑盒
+   ============================================================ */
+.amap-route-box {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.amap-route-box:focus-within {
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);
+}
+
+.amap-route-box.in-modal {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.amap-route-box.in-modal:focus-within {
+  border-color: #0284c7;
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.15);
+}
+
+.amap-route-box-main {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  position: relative;
+}
+
+/* 左侧纵向时间轴与连接线 */
+.route-timeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  width: 14px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.timeline-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  z-index: 2;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.timeline-dot.start {
+  background: #10b981;
+  color: rgba(16, 185, 129, 0.6);
+}
+
+.timeline-dot.end {
+  background: #ef4444;
+  color: rgba(239, 68, 68, 0.6);
+}
+
+.timeline-line {
+  flex: 1;
+  width: 2px;
+  border-left: 2px dotted #64748b;
+  margin: 3px 0;
+  opacity: 0.6;
+}
+
+.amap-route-box.in-modal .timeline-line {
+  border-left-color: #cbd5e1;
+}
+
+/* 中间输入流 */
+.route-inputs-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.route-input-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.route-input-row input {
+  flex: 1;
+  width: 100%;
+  background: rgba(2, 6, 23, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #f8fafc;
+  padding: 8px 32px 8px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.amap-route-box.in-modal .route-input-row input {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.route-input-row input:focus {
+  border-color: #38bdf8;
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
+.amap-route-box.in-modal .route-input-row input:focus {
+  border-color: #0284c7;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(2, 132, 199, 0.2);
+}
+
+.btn-input-pin {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.75;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.btn-input-pin:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* 途经点列表容器 */
+.via-points-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.via-point-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px dashed rgba(99, 102, 241, 0.4);
+  border-radius: 8px;
+  padding: 2px 6px;
+  gap: 6px;
+  animation: viaSlideIn 0.22s ease-out;
+}
+
+.amap-route-box.in-modal .via-point-row {
+  background: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+}
+
+@keyframes viaSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.via-dot-icon {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6366f1;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px rgba(99, 102, 241, 0.8);
+}
+
+.via-point-row input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 6px 4px;
+  font-size: 12px;
+  color: #f1f5f9;
+  outline: none;
+}
+
+.amap-route-box.in-modal .via-point-row input {
+  color: #1e293b;
+}
+
+.via-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-via-remove {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.btn-via-remove:hover {
+  color: #ef4444;
+  transform: scale(1.15);
+}
+
+.via-drag-handle {
+  color: #64748b;
+  cursor: grab;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+}
+
+.via-drag-handle:hover {
+  opacity: 1;
+  color: #38bdf8;
+}
+
+/* 右侧快捷按钮栏 */
+.route-actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.btn-route-action {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.amap-route-box.in-modal .btn-route-action {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.btn-route-action:hover {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: scale(1.1);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+.btn-route-action.btn-swap-od:active {
+  transform: rotate(180deg) scale(0.95);
+}
+
+/* 地图上的高德途经点 Marker 样式 */
+.amap-custom-via-marker {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.amap-custom-via-marker:hover {
+  transform: scale(1.2);
+}
+
+/* ============================================================
+   高德经典路线偏好设置 (权重与策略选择器)
+   ============================================================ */
+.amap-route-preference-box {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  transition: all 0.25s ease;
+}
+
+.amap-route-preference-box.in-modal {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  margin-top: 10px;
+  margin-bottom: 12px;
+}
+
+.preference-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 8px;
+}
+
+.preference-header .pref-arrow {
+  color: #0284c7;
+  font-size: 13px;
+  transition: transform 0.2s ease;
+}
+
+.preference-header .pref-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.amap-route-preference-box.in-modal .pref-title {
+  color: #475569;
+}
+
+.preference-header:hover .pref-title {
+  color: #38bdf8;
+}
+
+.preference-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  transition: max-height 0.25s ease, opacity 0.25s ease;
+}
+
+.amap-route-preference-box.collapsed .preference-chips-wrap {
+  display: none;
+}
+
+.amap-route-preference-box.collapsed .pref-arrow {
+  transform: rotate(-90deg);
+}
+
+.pref-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.amap-route-preference-box.in-modal .pref-chip-btn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pref-chip-btn:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.amap-route-preference-box.in-modal .pref-chip-btn:hover {
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.pref-chip-btn.active {
+  background: rgba(14, 165, 233, 0.16);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.amap-route-preference-box.in-modal .pref-chip-btn.active {
+  background: #ffffff;
+  border-color: #0284c7;
+  color: #0284c7;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
+}
+
 .form-item {
   display: flex;
   flex-direction: column;
@@ -2433,20 +2856,37 @@ body.mode-driver .nav-compass-btn {
 }
 
 /* ============================================================
-   备选路线选择栏 (高德经典多路线方案 Chips)
+   备选路线选择栏 (高德经典多路线方案 Chips - 适配全屏与小屏)
    ============================================================ */
 .route-choice-chips-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 12px;
   overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
+  overflow-y: hidden;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.25) transparent;
 }
 
 .route-choice-chips-bar::-webkit-scrollbar {
-  display: none;
+  height: 3px;
+}
+
+.route-choice-chips-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.route-choice-chips-bar::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 3px;
+}
+
+.route-choice-chips-bar::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.6);
 }
 
 .choice-title {
@@ -2455,33 +2895,39 @@ body.mode-driver .nav-compass-btn {
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
+  user-select: none;
+}
+
+.choice-title .title-short {
+  display: none;
 }
 
 .route-chip-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  border-radius: 10px;
-  padding: 5px 10px;
+  gap: 5px;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 8px;
+  padding: 4px 8px;
   color: #cbd5e1;
   font-size: 11px;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   transition: all 0.2s ease;
+  user-select: none;
 }
 
 .route-chip-btn:hover {
   background: rgba(30, 41, 59, 0.95);
-  border-color: rgba(56, 189, 248, 0.5);
+  border-color: rgba(56, 189, 248, 0.55);
   color: #fff;
   transform: translateY(-1px);
 }
 
 .route-chip-btn.active {
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.4), rgba(14, 165, 233, 0.25));
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.45), rgba(14, 165, 233, 0.3));
   border-color: #38bdf8;
   color: #fff;
   font-weight: 700;
@@ -2489,11 +2935,13 @@ body.mode-driver .nav-compass-btn {
 }
 
 .route-chip-btn .chip-tag {
-  font-size: 9px;
+  font-size: 9.5px;
   padding: 1px 5px;
   border-radius: 4px;
   background: rgba(148, 163, 184, 0.2);
   color: #94a3b8;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .route-chip-btn .chip-tag.best {
@@ -2505,6 +2953,66 @@ body.mode-driver .nav-compass-btn {
 .route-chip-btn.active .chip-tag {
   background: #0284c7;
   color: #fff;
+}
+
+.chip-main-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.chip-road-name {
+  font-weight: 600;
+  color: #f1f5f9;
+  font-size: 11px;
+}
+
+.chip-metrics-text {
+  color: #94a3b8;
+  font-size: 10.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.route-chip-btn.active .chip-metrics-text {
+  color: #bae6fd;
+}
+
+.route-chip-btn .chip-detail-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(56, 189, 248, 0.25);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  border-radius: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  margin-left: 2px;
+  color: #38bdf8;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.route-chip-btn .chip-detail-badge:hover {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+}
+
+.route-chip-btn.detail-quick-btn {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.route-chip-btn.detail-quick-btn:hover {
+  background: rgba(14, 165, 233, 0.28);
+  color: #ffffff;
+  border-color: #38bdf8;
 }
 
 .route-chip-btn.more-btn {
@@ -2848,6 +3356,430 @@ body.mode-driver .nav-compass-btn {
   filter: brightness(1.1);
   transform: translateY(-1px);
 }
+
+/* ==========================================================================
+   高仿高德官方路线详情弹窗样式 (Route Detail Modal & Drawer)
+   ========================================================================== */
+.route-detail-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.route-detail-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+.route-detail-card {
+  position: relative;
+  z-index: 10;
+  background: #ffffff;
+  color: #1e293b;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 460px;
+  height: 86vh;
+  max-height: 760px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  animation: detailSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes detailSlideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 顶部标题栏 */
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.btn-detail-back, .btn-detail-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  transition: all 0.15s;
+}
+
+.btn-detail-back:hover, .btn-detail-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btn-detail-close {
+  font-size: 16px;
+  font-weight: 700;
+  width: 32px;
+  height: 32px;
+}
+
+.detail-header-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-header-text h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.2px;
+}
+
+.detail-chip-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+/* 方案概览总览栏 */
+.detail-overview-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.overview-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.metric-num {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  font-family: var(--font-mono, monospace);
+}
+
+.metric-num.highlight {
+  color: #0284c7;
+}
+
+.metric-unit {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.overview-divider {
+  width: 1px;
+  height: 24px;
+  background: #cbd5e1;
+}
+
+/* 途经道路滚动区域 */
+.detail-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 24px 20px;
+}
+
+/* 起点与终点圆标 */
+.timeline-endpoint {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.endpoint-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.endpoint-circle.start {
+  background: #10b981;
+}
+
+.endpoint-circle.end {
+  background: #f43f5e;
+}
+
+.endpoint-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.endpoint-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.endpoint-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* 道路段列表 */
+.detail-roads-list {
+  display: flex;
+  flex-direction: column;
+  margin-left: 12px;
+  border-left: 2px dashed #cbd5e1;
+  padding-left: 26px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.road-item-card {
+  position: relative;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.road-item-card:last-child {
+  border-bottom: none;
+}
+
+.road-item-node {
+  position: absolute;
+  left: -37px;
+  top: 14px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #475569;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.road-item-card:hover .road-item-node {
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.road-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.road-name-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.road-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.road-meta {
+  font-size: 12px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.road-meta-tag {
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.road-toggle-arrow {
+  font-size: 13px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.road-item-card.expanded .road-toggle-arrow {
+  transform: rotate(180deg);
+  color: #0284c7;
+}
+
+/* 展开的微观指引步骤 */
+.road-substeps-list {
+  display: none;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 2px solid #38bdf8;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.road-item-card.expanded .road-substeps-list {
+  display: flex;
+}
+
+.substep-row {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.substep-bullet {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+/* 底部按钮栏 */
+.detail-footer-actions {
+  padding: 12px 16px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.btn-apply-and-nav {
+  width: 100%;
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+  transition: all 0.15s;
+}
+
+.btn-apply-and-nav:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* 顶部 Chips 旁边的详情按钮样式 (保障不换行、不被挤压变形) */
+.btn-open-detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  margin-left: 2px;
+}
+
+.btn-open-detail-link:hover {
+  background: rgba(14, 165, 233, 0.3);
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 900px) {
+  .choice-title .title-full {
+    display: none;
+  }
+  .choice-title .title-short {
+    display: inline;
+  }
+}
+
+@media (max-width: 640px) {
+  .route-choice-chips-bar {
+    gap: 4px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+  .route-chip-btn {
+    padding: 3px 6px;
+    font-size: 10px;
+    gap: 4px;
+    border-radius: 6px;
+  }
+  .route-chip-btn .chip-tag {
+    font-size: 8.5px;
+    padding: 0 4px;
+  }
+  .chip-road-name {
+    font-size: 10px;
+  }
+  .chip-metrics-text {
+    font-size: 9.5px;
+  }
+  .route-chip-btn .chip-detail-badge {
+    font-size: 8.5px;
+    padding: 0 4px;
+    margin-left: 1px;
+  }
+  .route-detail-modal {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .route-detail-card {
+    max-width: 100%;
+    height: 84vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.45);
+  }
+}
+
 
 
 
