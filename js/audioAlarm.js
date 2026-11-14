@@ -80,7 +80,7 @@ class AudioAlarmEngine {
         utter.lang = 'zh-CN';
         utter.rate = 1.05;
         utter.pitch = 1.0;
-        window.speechSynthesis.speak(utter);
+        // window.speechSynthesis.speak(utter);
       }
     } catch (e) {
       console.warn('语音播报异常:', e);

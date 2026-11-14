@@ -112,6 +112,8 @@ class RoutePlanningEngine {
     this.trafficSegments = r.trafficSegments || [];
     this.highway = r.via || r.name;
     this.currentTolls = r.tolls;
+    this.majorRoadBadges = r.majorRoadBadges || [];
+    this.majorRoadsChain = r.majorRoadsChain || '';
     this.highDenseLine = this.interpolatePoints(this.baseCoordinates, 25);
     return true;
   }
@@ -470,76 +472,40 @@ class RoutePlanningEngine {
 
     const jsSecCode = (window._AMapSecurityConfig && window._AMapSecurityConfig.securityJsCode) || 'c080bcca0b7ded38b6d8cd8e6093946f';
 
-    // 1. 直接调取高德官方货车路径规划接口 https://restapi.amap.com/v4/direction/truck
+    // 1. 直接调取高德官方货车路径规划接口 https://restapi.amap.com/v4/direction/truck (单次请求，高德返回几条数据就生成几条方案)
     try {
-      const fetchTruckStrategy = async (stratCode) => {
-        const truckQuery = new URLSearchParams({
-          key: amapKey,
-          origin: origStr,
-          destination: destStr,
-          size: String(this.truckParams.size),
-          height: String(this.truckParams.height),
-          width: String(this.truckParams.width),
-          load: String(this.truckParams.weight), // 车辆总重 (吨)
-          weight: String(Math.max(5, this.truckParams.weight * 0.75).toFixed(1)), // 核定载重 (吨)
-          axis: String(this.truckParams.axis), // 车轴数
-          strategy: String(stratCode)
-        });
-        if (amapKey === 'c25e742146a48457dc5eefa6688eb5b6' && jsSecCode) {
-          truckQuery.set('s', 'rsv3');
-          truckQuery.set('jscode', jsSecCode);
-        }
-        if (viaCoords.length > 0) {
-          truckQuery.set('waypoints', viaCoords.map(c => `${c[0].toFixed(6)},${c[1].toFixed(6)}`).join(';'));
-        }
-        const truckUrl = `https://restapi.amap.com/v4/direction/truck?${truckQuery.toString()}`;
-        const truckResp = await fetch(truckUrl);
-        const truckData = await truckResp.json();
-        const paths = (truckData && truckData.errcode === 0 && truckData.data && truckData.data.route && truckData.data.route.paths)
-          ? truckData.data.route.paths
-          : ((truckData && truckData.status === '1' && truckData.route && truckData.route.paths) ? truckData.route.paths : null);
-        if (paths && paths.length > 0) {
-          paths.forEach(p => { p._sourceStrategyCode = String(stratCode); });
-        }
-        return { paths, truckData };
-      };
+      const truckQuery = new URLSearchParams({
+        key: amapKey,
+        origin: origStr,
+        destination: destStr,
+        size: String(this.truckParams.size),
+        height: String(this.truckParams.height),
+        width: String(this.truckParams.width),
+        load: String(this.truckParams.weight), // 车辆总重 (吨)
+        weight: String(Math.max(5, this.truckParams.weight * 0.75).toFixed(1)), // 核定载重 (吨)
+        axis: String(this.truckParams.axis), // 车轴数
+        strategy: String(v4TruckStrategy)
+      });
+      if (amapKey === 'c25e742146a48457dc5eefa6688eb5b6' && jsSecCode) {
+        truckQuery.set('s', 'rsv3');
+        truckQuery.set('jscode', jsSecCode);
+      }
+      if (viaCoords.length > 0) {
+        truckQuery.set('waypoints', viaCoords.map(c => `${c[0].toFixed(6)},${c[1].toFixed(6)}`).join(';'));
+      }
+      const truckUrl = `https://restapi.amap.com/v4/direction/truck?${truckQuery.toString()}`;
+      const truckResp = await fetch(truckUrl);
+      const truckData = await truckResp.json();
 
-      const { paths: v4Paths, truckData } = await fetchTruckStrategy(v4TruckStrategy);
+      const v4Paths = (truckData && truckData.errcode === 0 && truckData.data && truckData.data.route && truckData.data.route.paths)
+        ? truckData.data.route.paths
+        : ((truckData && truckData.status === '1' && truckData.route && truckData.route.paths) ? truckData.route.paths : null);
 
       if (v4Paths && v4Paths.length > 0) {
-        const mergedPaths = [...v4Paths];
-
-        // 高德官方规则：仅 strategy=11 且在 500Km 以内单次返回多条 (count=3)；
-        // 当超过 500Km 或选择 strategy=1~10,12,13 时单次请求只返回 1 条 (count=1)。
-        // 为保证常に提供最多 3 条真实且不同走向的货车备选方案，自动并发请求互补策略并按里程/收费去重合并：
-        if (mergedPaths.length < 3) {
-          const backupStrategies = ['8', '3', '13', '2', '1'].filter(s => s !== String(v4TruckStrategy));
-          const extraResults = await Promise.all(
-            backupStrategies.slice(0, 3).map(s => fetchTruckStrategy(s).catch(() => ({ paths: null })))
-          );
-          for (const res of extraResults) {
-            if (!res || !res.paths) continue;
-            for (const candPath of res.paths) {
-              if (mergedPaths.length >= 3) break;
-              const candDist = Number(candPath.distance || 0);
-              const candTolls = Number(candPath.tolls || 0);
-              const isDuplicate = mergedPaths.some(existing => {
-                const exDist = Number(existing.distance || 0);
-                const exTolls = Number(existing.tolls || 0);
-                return Math.abs(exDist - candDist) < 800 && Math.abs(exTolls - candTolls) < 5;
-              });
-              if (!isDuplicate) {
-                mergedPaths.push(candPath);
-              }
-            }
-            if (mergedPaths.length >= 3) break;
-          }
-        }
-
-        multiPaths = mergedPaths.slice(0, 3);
+        multiPaths = v4Paths;
         path = multiPaths[0];
         this.isUsingOfficialTruckApi = true;
-        engineName = `高德官方货车路径规划引擎 (v4/direction/truck strategy=${v4TruckStrategy} · 共${multiPaths.length}条真实方案)`;
+        engineName = `高德官方货车路径规划引擎 (v4/direction/truck strategy=${v4TruckStrategy} · 返回${multiPaths.length}条方案)`;
       } else {
         console.warn(`高德 v4/direction/truck 返回提示:`, truckData);
       }
@@ -637,6 +603,82 @@ class RoutePlanningEngine {
       return all.filter((pt, idx) => idx === 0 || pt[0] !== all[idx - 1][0] || pt[1] !== all[idx - 1][1]);
     };
 
+    // 从高德返回的 steps 中提取沿途主要高速/国道干线名称、各段里程与地图路牌坐标
+    const extractMajorRoadsFromSteps = (pSteps = []) => {
+      const roadMap = new Map();
+      const orderedRoads = [];
+
+      pSteps.forEach((step, idx) => {
+        let rName = String(step.road || step.road_name || '').trim();
+        if (!rName && step.instruction) {
+          const m = String(step.instruction).match(/沿([^向往途径进入行驶\s,，。]+)/);
+          if (m && m[1]) rName = m[1].trim();
+        }
+        if (!rName || rName === '无名道路' || rName === '内部道路' || rName.includes('出口') || rName.includes('入口') || rName.includes('匝道')) {
+          return;
+        }
+        const stepDist = Number(step.distance || step.step_distance || 0);
+        const stepPts = [];
+        if (step.polyline) {
+          step.polyline.split(';').forEach(pair => {
+            const parts = pair.split(',').map(Number);
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+              stepPts.push(parts);
+            }
+          });
+        }
+        const midPt = stepPts.length > 0 ? stepPts[Math.floor(stepPts.length / 2)] : null;
+
+        if (!roadMap.has(rName)) {
+          const entry = {
+            name: rName,
+            totalDist: stepDist,
+            longestStepDist: stepDist,
+            midCoord: midPt,
+            firstStepIdx: idx,
+            isHighway: rName.includes('高速'),
+            isNational: /^G\d+/i.test(rName) || rName.includes('国道') || rName.includes('快速')
+          };
+          roadMap.set(rName, entry);
+          orderedRoads.push(entry);
+        } else {
+          const entry = roadMap.get(rName);
+          entry.totalDist += stepDist;
+          if (stepDist > entry.longestStepDist && midPt) {
+            entry.longestStepDist = stepDist;
+            entry.midCoord = midPt;
+          }
+        }
+      });
+
+      // 优先筛选高速/快速路/国道，或单条道路累计行驶超过 3km 的主干道
+      let significant = orderedRoads.filter(r => r.midCoord && (r.isHighway || r.isNational || r.totalDist >= 3000));
+      if (significant.length === 0) {
+        significant = orderedRoads.filter(r => r.midCoord && r.totalDist >= 500);
+      }
+
+      // 按里程排序选出最重要的前 6 条干线，再恢复它们在路线上的先后顺序用于地图标注和途经链展示
+      const topByDist = [...significant].sort((a, b) => {
+        if (a.isHighway !== b.isHighway) return a.isHighway ? -1 : 1;
+        return b.totalDist - a.totalDist;
+      });
+
+      const topTwoNames = topByDist.slice(0, 2).map(r => r.name);
+      const viaSummary = topTwoNames.length > 0 ? topTwoNames.join('·') : '';
+
+      const selectedForMap = topByDist.slice(0, 6).sort((a, b) => a.firstStepIdx - b.firstStepIdx);
+      const majorRoadBadges = selectedForMap.map(r => ({
+        name: r.name,
+        distanceKm: Number((r.totalDist / 1000).toFixed(1)),
+        coord: r.midCoord,
+        isHighway: r.isHighway,
+        isNational: r.isNational
+      }));
+
+      const majorRoadsChain = selectedForMap.map(r => `${r.name}(${Math.max(1, Math.round(r.totalDist / 1000))}km)`).join(' ➔ ');
+      return { viaSummary, majorRoadBadges, majorRoadsChain };
+    };
+
     if (multiPaths && multiPaths.length > 0) {
       const h = (this.truckParams && this.truckParams.height) ? this.truckParams.height : 4.0;
       const { truckClass, tollFactor, durationFactor } = this.getTruckClassAndFactors(this.truckParams);
@@ -702,41 +744,44 @@ class RoutePlanningEngine {
         const pathSourceMeta = truckStrategyLabelMap[pathSourceCode] || strategyMeta;
         const apiPathStrategy = p && p.strategy ? String(p.strategy).trim() : '';
 
+        // 提取该路线真实途经的高速名称与沿线主干道路牌
+        const { viaSummary, majorRoadBadges, majorRoadsChain } = extractMajorRoadsFromSteps(p.steps || []);
+
         let tag = idx === 0 ? strategyMeta.tag : `方案${idx + 1}·备选`;
-        let via = idx === 0 ? strategyMeta.via : '备选通道';
+        let via = viaSummary || (idx === 0 ? strategyMeta.via : '备选通道');
 
         const isCheapest = tollsNum === minTollVal;
         const isShortestDist = Math.abs(dist - minDistVal) < 100 && (sortedList.some(o => o.dist - dist > 3000));
         const isFastest = dur === minDurVal || idx === 0;
 
         if (sortedList.length === 1) {
-          // 单条返回结果时
+          // 单条返回结果时，卡片主标题优先展示具体途经高速名 (如 "大广高速·长深高速")
           tag = strategyMeta.tag;
-          via = apiPathStrategy || strategyMeta.via;
+          via = viaSummary || apiPathStrategy || strategyMeta.via;
         } else {
-          // 多条返回结果时 (包括 500Km 以内的 strategy=11，或跨省长途并发互补策略合并的多条真实方案)
+          // 多条返回结果时
           if (idx === 0) {
             tag = strategyMeta.tag;
-            via = apiPathStrategy || (isFastest ? '综合最优' : strategyMeta.via);
+            via = viaSummary || apiPathStrategy || (isFastest ? '综合最优' : strategyMeta.via);
           } else {
             if (pathSourceCode !== activeCode && pathSourceMeta) {
               tag = `方案${idx + 1}·${pathSourceMeta.short}`;
-              via = apiPathStrategy || pathSourceMeta.via;
+              via = viaSummary || apiPathStrategy || pathSourceMeta.via;
             } else if (apiPathStrategy) {
               tag = `方案${idx + 1}·${apiPathStrategy}`;
-              via = isCheapest && tollsNum === 0 ? '地面干线' : (isShortestDist ? '短途干线' : '备选干线');
+              via = viaSummary || (isCheapest && tollsNum === 0 ? '地面干线' : (isShortestDist ? '短途干线' : '备选干线'));
             } else if (isCheapest && minTollVal < sortedList[0].tollsNum) {
               tag = minTollVal === 0 ? `方案${idx + 1}·免过路费` : `方案${idx + 1}·费用最低`;
-              via = minTollVal === 0 ? '地面干线' : '经济通道';
+              via = viaSummary || (minTollVal === 0 ? '地面干线' : '经济通道');
             } else if (isShortestDist) {
               tag = `方案${idx + 1}·里程最短`;
-              via = '绕行干线';
+              via = viaSummary || '绕行干线';
             } else if (tollsNum > sortedList[0].tollsNum) {
               tag = `方案${idx + 1}·高速备选`;
-              via = '主线高速';
+              via = viaSummary || '主线高速';
             } else {
               tag = `方案${idx + 1}·备选方案`;
-              via = '备选通道';
+              via = viaSummary || '备选通道';
             }
           }
         }
@@ -748,13 +793,16 @@ class RoutePlanningEngine {
 
         const tollDesc = tolls !== '0' ? `，${truckClass}类车(${this.truckParams.axis}轴)预估过路费约 ￥${tolls}` : '，免过路费';
         const heightWarning = (h > 4.0 && (tollsNum === 0 || via.includes('地面'))) ? ` [⚠️车高${h}m注意立交限高门架]` : '';
+        const roadsDesc = majorRoadsChain ? ` | 途经: ${majorRoadsChain}` : '';
 
         return {
           index: idx,
           name: `${tag} ${via}`,
           tag: tag,
           via: via,
-          desc: `全程 ${(dist / 1000).toFixed(1)}km，货车预估约 ${Math.round(dur / 60)}分钟${tollDesc}${heightWarning}`,
+          majorRoadBadges: majorRoadBadges,
+          majorRoadsChain: majorRoadsChain,
+          desc: `全程 ${(dist / 1000).toFixed(1)}km，货车预估约 ${Math.round(dur / 60)}分钟${tollDesc}${roadsDesc}${heightWarning}`,
           distanceMeters: dist,
           durationSeconds: dur,
           tolls: tolls,

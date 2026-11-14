@@ -3807,6 +3807,292 @@ body.mode-driver .nav-compass-btn {
   display: none;
 }
 
+/* 顶部居中交互轻提示 Toast */
+.ui-toast-notification {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-18px);
+  z-index: 260;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #f8fafc;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  white-space: nowrap;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-toast-notification.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.ui-toast-notification.toast-loading {
+  border-color: rgba(250, 204, 21, 0.6);
+  color: #fef08a;
+}
+
+.ui-toast-notification.toast-success {
+  border-color: rgba(16, 185, 129, 0.6);
+  color: #6ee7b7;
+}
+
+/* 地图沿线高速路牌与主干道名称标注 */
+.map-road-name-sign {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 5px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  color: #ffffff;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.42);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.map-road-name-sign:hover {
+  transform: scale(1.07);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* 国家/省级高速公路标准绿底白字路牌样式 */
+.map-road-name-sign.highway {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  border: 1.5px solid #a7f3d0;
+}
+
+.map-road-name-sign.highway .road-sign-tag {
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* 国道/快速路蓝底路牌样式 */
+.map-road-name-sign.national {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  border: 1.5px solid #93c5fd;
+}
+
+.map-road-name-sign.national .road-sign-tag {
+  background: #f59e0b;
+  color: #0f172a;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* 普通主干道深色科技路牌 */
+.map-road-name-sign.trunk {
+  background: rgba(15, 23, 42, 0.92);
+  border: 1.5px solid #38bdf8;
+}
+
+.map-road-name-sign.trunk .road-sign-tag {
+  background: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.map-road-name-sign .road-sign-name {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.map-road-name-sign .road-sign-km {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.24);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+/* 地图左上/顶部比例尺放大与沿途具体道路巡检控制条 */
+.map-road-zoom-bar {
+  position: absolute;
+  top: 14px;
+  left: 96px;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: calc(100% - 110px);
+  pointer-events: none;
+}
+
+.zoom-bar-main-btns,
+.zoom-bar-road-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.zoom-action-btn,
+.zoom-step-btn {
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: all 0.16s ease;
+}
+
+.zoom-action-btn.primary {
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  border-color: #7dd3fc;
+  color: #ffffff;
+}
+
+.zoom-action-btn:hover,
+.zoom-step-btn:hover {
+  transform: translateY(-1px);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.zoom-step-btn {
+  padding: 5px 10px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.road-jump-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(16, 185, 129, 0.55);
+  color: #a7f3d0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  transition: all 0.15s ease;
+}
+
+.road-jump-chip:hover,
+.road-jump-chip.active {
+  background: #059669;
+  border-color: #ecfdf5;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* 大屏模式下底部路线确认卡片黄金宽度居中与排版优化 */
+.driver-route-confirm-card {
+  max-width: 780px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 16px 20px;
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(9, 14, 28, 0.97) 100%);
+}
+
+.driver-route-confirm-card .confirm-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+
+.driver-route-confirm-card .corridor-badge {
+  margin-left: auto;
+}
+
+.driver-route-confirm-card .confirm-od-group {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  background: rgba(30, 41, 59, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.driver-route-confirm-card .confirm-od-group .od-col:last-child {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.driver-route-confirm-card .confirm-od-group .od-col:last-child .od-texts {
+  align-items: flex-end;
+}
+
+.driver-route-confirm-card .od-col-mid {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px dashed rgba(56, 189, 248, 0.35);
+  border-radius: 10px;
+  padding: 5px 14px;
+  min-width: 150px;
+}
+
+/* 弹窗暗黑科技感细滚动条优化 (消除原生白色粗滚动条) */
+.route-modal-body,
+.detail-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.35) rgba(15, 23, 42, 0.4);
+}
+
+.route-modal-body::-webkit-scrollbar,
+.detail-scroll-area::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.route-modal-body::-webkit-scrollbar-track,
+.detail-scroll-area::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.35);
+  border-radius: 999px;
+}
+
+.route-modal-body::-webkit-scrollbar-thumb,
+.detail-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.38);
+  border-radius: 999px;
+}
+
+.route-modal-body::-webkit-scrollbar-thumb:hover,
+.detail-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.65);
+}
+
+
+
+
 
 
 

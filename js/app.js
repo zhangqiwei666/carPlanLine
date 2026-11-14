@@ -7,7 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     viewMode: '3D',
     pitch: 0,
     rotation: 0,
-    zoom: 11,
+    zoom: 12,
+    showLabel: true,
+    features: ['bg', 'road', 'building', 'point'],
     center: [113.8000, 22.9500]
   });
 
@@ -31,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. 地图图层变量定义
   let plannedPolylineLayer = null;
   let trafficPolylineLayers = [];
+  let candidateBackupLayers = [];
+  let roadSignMarkers = [];
   let corridorPolygonLayer = null;
   let actualTrackLayer = null;
   let truckMarker = null;
@@ -38,6 +42,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let startMarker = null;
   let endMarker = null;
   let viaMarkers = [];
+  let toastTimer = null;
+
+  function showToast(message, type = 'info', duration = 2600) {
+    const el = document.getElementById('uiToastNotification');
+    if (!el) return;
+    if (toastTimer) clearTimeout(toastTimer);
+    el.className = `ui-toast-notification visible ${type === 'loading' ? 'toast-loading' : (type === 'success' ? 'toast-success' : '')}`;
+    el.textContent = message;
+    if (duration > 0) {
+      toastTimer = setTimeout(() => {
+        el.classList.remove('visible');
+      }, duration);
+    }
+  }
 
   // 途经点 (中间节点) 响应式状态列表: [{ id, value }]
   let viaPointsState = [{ id: 1, value: '' }];
@@ -84,6 +102,42 @@ document.addEventListener('DOMContentLoaded', () => {
     if (viaMarkers && viaMarkers.length) {
       map.remove(viaMarkers);
       viaMarkers = [];
+    }
+    if (candidateBackupLayers.length) {
+      map.remove(candidateBackupLayers);
+      candidateBackupLayers = [];
+    }
+    if (roadSignMarkers.length) {
+      map.remove(roadSignMarkers);
+      roadSignMarkers = [];
+    }
+
+    // 若高德返回了多条候选方案，在地图上同步绘制备选灰蓝折线，支持点击切换
+    const candidates = window.routeEngine.candidateRoutes || [];
+    const activeIdx = window.routeEngine.activeCandidateIndex || 0;
+    if (!isDriverNavActive && candidates.length > 1) {
+      candidates.forEach((cand, idx) => {
+        if (idx === activeIdx || !cand.coords || cand.coords.length < 2) return;
+        const backupPoly = new AMap.Polyline({
+          path: cand.coords,
+          isOutline: true,
+          outlineColor: '#1e293b',
+          borderWeight: 1,
+          strokeColor: '#64748b',
+          strokeOpacity: 0.78,
+          strokeWeight: 8,
+          strokeLineJoin: 'round',
+          strokeLineCap: 'round',
+          showDir: true,
+          cursor: 'pointer',
+          zIndex: 25 + idx
+        });
+        backupPoly.on('click', () => {
+          applyCandidateRoute(idx);
+        });
+        map.add(backupPoly);
+        candidateBackupLayers.push(backupPoly);
+      });
     }
 
     const corridorGeoJson = window.routeEngine.getCorridorBuffer(window.deviationDetector.thresholdMeters);
@@ -178,7 +232,94 @@ document.addEventListener('DOMContentLoaded', () => {
         markersToAdd.push(vMarker);
       });
     }
+
+    // 标记沿途高速名称与主干道路牌标注 (如：大广高速、京港澳高速、长深高速等)
+    let badgesToRender = window.routeEngine.majorRoadBadges || [];
+    if ((!badgesToRender || badgesToRender.length === 0) && window.routeEngine.trafficSegments && lngLats.length > 10) {
+      // 预设示范路线保底生成高速/干线名称路牌
+      badgesToRender = window.routeEngine.trafficSegments
+        .filter(s => s.label && (s.endRatio - s.startRatio) >= 0.14)
+        .slice(0, 4)
+        .map(s => {
+          const midRatio = (s.startRatio + s.endRatio) / 2;
+          const ptIdx = Math.min(lngLats.length - 1, Math.max(0, Math.floor(lngLats.length * midRatio)));
+          const segKm = (((window.routeEngine.totalDistanceMeters || 100000) * (s.endRatio - s.startRatio)) / 1000).toFixed(0);
+          return {
+            name: s.label,
+            distanceKm: Number(segKm),
+            coord: lngLats[ptIdx],
+            isHighway: s.label.includes('高速') || s.label.includes('大桥'),
+            isNational: s.label.includes('国道') || s.label.includes('快速')
+          };
+        });
+    }
+
+    if (badgesToRender && badgesToRender.length > 0) {
+      badgesToRender.forEach((b, bIdx) => {
+        if (!b.coord) return;
+        const badgeTypeClass = b.isHighway ? 'highway' : (b.isNational ? 'national' : 'trunk');
+        const distLabel = b.distanceKm >= 1 ? `${Math.round(b.distanceKm)}km` : '';
+        const signEl = document.createElement('div');
+        signEl.className = `map-road-name-sign ${badgeTypeClass}`;
+        signEl.title = `点击放大查看【${b.name}】具体道路细节`;
+        signEl.innerHTML = `
+          <span class="road-sign-tag">${b.isHighway ? '高速' : (b.isNational ? '国/快' : '干线')}</span>
+          <strong class="road-sign-name">${b.name}</strong>
+          ${distLabel ? `<span class="road-sign-km">${distLabel}</span>` : ''}
+        `;
+        signEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          autoFollow = false;
+          map.setPitch(32);
+          map.setZoomAndCenter(13.8, b.coord);
+          showToast(`🔍 已放大定位至【${b.name}】具体路段（行驶约 ${distLabel || '主干道'}）`, 'success', 2800);
+        });
+        const rMarker = new AMap.Marker({
+          position: b.coord,
+          content: signEl,
+          offset: new AMap.Pixel(-52, -14),
+          zIndex: 55 + bIdx
+        });
+        roadSignMarkers.push(rMarker);
+        markersToAdd.push(rMarker);
+      });
+    }
+
     map.add(markersToAdd);
+
+    // 同步渲染地图顶部沿途高速/道路快速放大巡检条
+    const roadJumpContainer = document.getElementById('mapRoadJumpChips');
+    if (roadJumpContainer) {
+      roadJumpContainer.innerHTML = '';
+      const jumpItems = [
+        { label: '🚀 起点路段', coord: startPt, zoom: 15, pitch: 40 },
+        ...(badgesToRender || []).map(b => ({
+          label: `🛣️ ${b.name}`,
+          coord: b.coord,
+          zoom: 13.6,
+          pitch: 32
+        })),
+        { label: '🎯 终点路段', coord: endPt, zoom: 15, pitch: 40 }
+      ];
+      jumpItems.forEach((item) => {
+        if (!item.coord) return;
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'road-jump-chip';
+        chip.textContent = item.label;
+        chip.title = `点击将地图比例尺放大到【${item.label}】查看具体道路与高速名称`;
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          autoFollow = false;
+          roadJumpContainer.querySelectorAll('.road-jump-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          map.setPitch(item.pitch || 35);
+          map.setZoomAndCenter(item.zoom || 14, item.coord);
+          showToast(`🔍 已放大展示【${item.label}】具体线路与周边道路名称`, 'success', 2600);
+        });
+        roadJumpContainer.appendChild(chip);
+      });
+    }
 
     if (document.body.classList.contains('mode-driver') && !isDriverNavActive) {
       map.setFitView([plannedPolylineLayer], false, [60, 35, 260, 35]);
@@ -193,13 +334,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmDur = document.getElementById('confirmDuration');
     const confirmMid = document.querySelector('.od-col-mid .od-arrow-line');
 
-    if (confirmStart) confirmStart.textContent = window.routeEngine.startName || '广州黄埔港物流中心';
-    if (confirmEnd) confirmEnd.textContent = window.routeEngine.endName || '东莞清溪智能产业园';
+    if (confirmStart) confirmStart.textContent = window.routeEngine.startName || '漯河双汇大厦';
+    if (confirmEnd) confirmEnd.textContent = window.routeEngine.endName || '唐山双汇食品有限责任公司';
     if (confirmDist) confirmDist.textContent = `${(window.routeEngine.totalDistanceMeters / 1000).toFixed(1)} km`;
     if (confirmDur) confirmDur.textContent = `${Math.round(window.routeEngine.durationSeconds / 60) || 102}`;
     if (confirmMid) {
+      const vNames = (window.routeEngine.viaNames || []).filter(Boolean);
       const vCount = (window.routeEngine.viaPoints && window.routeEngine.viaPoints.length) || 0;
-      confirmMid.textContent = vCount > 0 ? `➔ 经${vCount}个途经点 ➔` : '➔';
+      if (vCount > 0) {
+        const labelStr = vNames.length > 0 ? vNames.join(' · ') : `${vCount}个途经点`;
+        confirmMid.textContent = `➔ 途经: ${labelStr} ➔`;
+      } else {
+        confirmMid.textContent = `➔ ${window.routeEngine.highway || '全程直达'} ➔`;
+      }
+    }
+    const hintEl = document.querySelector('.od-col-mid .od-change-hint');
+    if (hintEl) {
+      const vCount = (window.routeEngine.viaPoints && window.routeEngine.viaPoints.length) || 0;
+      hintEl.textContent = vCount > 0 ? `查看/编辑 ${vCount} 个途经点 ❯` : '添加途经点 / 换路线 ❯';
     }
   }
 
@@ -824,7 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (matchedIdx !== currentMilestoneIndex) {
       currentMilestoneIndex = matchedIdx;
       if (isDriverNavActive && !isAlarm) {
-        window.audioAlarm.speak(matchedMilestone.voiceText);
+        // window.audioAlarm.speak(matchedMilestone.voiceText);
       }
     }
 
@@ -1756,13 +1908,120 @@ document.addEventListener('DOMContentLoaded', () => {
   const contentPresetRoutes = document.getElementById('contentPresetRoutes');
   const contentCustomRoute = document.getElementById('contentCustomRoute');
 
-  function openRouteSwitchModal() {
-    if (routeSwitchModal) routeSwitchModal.style.display = 'flex';
-    // 更新手机定位点文本
-    const gpsTxt = document.getElementById('modalGpsStartText');
-    if (gpsTxt && lastRealCoord) {
-      gpsTxt.textContent = `手机当前定位点 (${lastRealCoord[0].toFixed(3)}, ${lastRealCoord[1].toFixed(3)})`;
+  function renderDynamicWaypointsAndRoadsModalList() {
+    const listEl = document.getElementById('dynamicRouteWaypointsList');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    const sName = window.routeEngine.startName || document.getElementById('startPointInput')?.value || '起运地';
+    const eName = window.routeEngine.endName || document.getElementById('endPointInput')?.value || '目的地';
+    const line = window.routeEngine.highDenseLine || [];
+    const startCoord = line[0];
+    const endCoord = line[line.length - 1];
+    const viaCoords = window.routeEngine.viaPoints || [];
+    const viaNames = window.routeEngine.viaNames || [];
+    const roadBadges = window.routeEngine.majorRoadBadges || [];
+
+    const items = [];
+    if (startCoord) {
+      items.push({
+        badge: '起运地',
+        badgeCls: 'default',
+        title: sName,
+        sub: `坐标: ${startCoord[0].toFixed(5)}, ${startCoord[1].toFixed(5)}`,
+        meta: '出发集疏运起点',
+        coord: startCoord,
+        zoom: 15
+      });
     }
+
+    viaCoords.forEach((coord, i) => {
+      const vName = viaNames[i] || `途经点 ${i + 1}`;
+      items.push({
+        badge: `必经途经点 ${i + 1}`,
+        badgeCls: 'live',
+        title: vName,
+        sub: `坐标: ${coord[0].toFixed(5)}, ${coord[1].toFixed(5)}`,
+        meta: '高德货车规划必经节点',
+        coord: coord,
+        zoom: 14.5
+      });
+    });
+
+    roadBadges.forEach((rb) => {
+      items.push({
+        badge: rb.isHighway ? '途经高速' : '途经干线',
+        badgeCls: rb.isHighway ? 'airport' : 'port',
+        title: rb.name,
+        sub: `本段行驶约 ${rb.distanceKm} 公里`,
+        meta: '点击可在地图上放大查看该段具体道路走向',
+        coord: rb.coord,
+        zoom: 13.8
+      });
+    });
+
+    if (endCoord) {
+      items.push({
+        badge: '目的地',
+        badgeCls: 'bay',
+        title: eName,
+        sub: `坐标: ${endCoord[0].toFixed(5)}, ${endCoord[1].toFixed(5)}`,
+        meta: `全程约 ${((window.routeEngine.totalDistanceMeters || 0) / 1000).toFixed(1)} 公里`,
+        coord: endCoord,
+        zoom: 15
+      });
+    }
+
+    items.forEach((it) => {
+      const card = document.createElement('div');
+      card.className = 'preset-route-item';
+      card.innerHTML = `
+        <div class="preset-badge-row">
+          <span class="preset-tag ${it.badgeCls}">${it.badge}</span>
+          <span class="preset-highway">${it.sub}</span>
+        </div>
+        <div class="preset-main">
+          <div class="preset-od">
+            <strong class="p-start">${it.title}</strong>
+          </div>
+          <div class="preset-meta">
+            <span>📍 ${it.meta}</span>
+          </div>
+        </div>
+        <button type="button" class="btn-apply-preset">🔍 地图放大查看</button>
+      `;
+      card.addEventListener('click', () => {
+        closeRouteSwitchModal();
+        if (it.coord) {
+          autoFollow = false;
+          map.setPitch(36);
+          map.setZoomAndCenter(it.zoom || 14, it.coord);
+          showToast(`🔍 已放大定位至【${it.badge}：${it.title}】`, 'success', 2800);
+        }
+      });
+      listEl.appendChild(card);
+    });
+  }
+
+  function openRouteSwitchModal() {
+    const mainS = document.getElementById('startPointInput');
+    const mainE = document.getElementById('endPointInput');
+    const modS = document.getElementById('modalStartInput');
+    const modE = document.getElementById('modalEndInput');
+    if (mainS && modS) modS.value = mainS.value;
+    if (mainE && modE) modE.value = mainE.value;
+
+    renderViaPointsUI();
+    renderDynamicWaypointsAndRoadsModalList();
+
+    // 默认打开 Tab 1: 起终点与途经点设置
+    if (tabCustomRoute && tabPresetRoutes) {
+      tabCustomRoute.classList.add('active');
+      tabPresetRoutes.classList.remove('active');
+      if (contentCustomRoute) contentCustomRoute.style.display = 'block';
+      if (contentPresetRoutes) contentPresetRoutes.style.display = 'none';
+    }
+    if (routeSwitchModal) routeSwitchModal.style.display = 'flex';
   }
 
   function closeRouteSwitchModal() {
@@ -2451,15 +2710,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnInnavToggleAudio = document.getElementById('btnInnavToggleAudio');
   const btnDriverWakeAmapApp = document.getElementById('btnDriverWakeAmapApp');
 
-  // 视图模式切换
+  // 视图模式切换 (默认铺满大屏展示高清大地图)
   function setViewMode(mode) {
     if (mode === 'DRIVER') {
       document.body.classList.add('mode-driver');
-      document.body.classList.add('desktop-phone-sim-active');
+      document.body.classList.remove('desktop-phone-sim-active');
       if (btnModeDriver) btnModeDriver.classList.add('active');
       if (btnModeDispatch) btnModeDispatch.classList.remove('active');
-      if (btnFrameSim) btnFrameSim.classList.add('active');
-      if (btnFrameFull) btnFrameFull.classList.remove('active');
+      if (btnFrameFull) btnFrameFull.classList.add('active');
+      if (btnFrameSim) btnFrameSim.classList.remove('active');
     } else {
       document.body.classList.remove('mode-driver');
       document.body.classList.remove('desktop-phone-sim-active');
@@ -2728,6 +2987,55 @@ document.addEventListener('DOMContentLoaded', () => {
       map.setRotation(-currentVehicleHeading);
       map.setPitch(is3DModeActive ? 40 : 0);
       appendLog('info', '【罗盘回正】已居中对准车辆位置，锁定车头朝上导航');
+    });
+  }
+
+  // 地图顶部比例尺放大/全览/逐级缩放按钮绑定
+  const btnZoomToStreetNav = document.getElementById('btnZoomToStreetNav');
+  const btnZoomFitOverview = document.getElementById('btnZoomFitOverview');
+  const btnMapZoomIn = document.getElementById('btnMapZoomIn');
+  const btnMapZoomOut = document.getElementById('btnMapZoomOut');
+
+  if (btnZoomToStreetNav) {
+    btnZoomToStreetNav.addEventListener('click', () => {
+      autoFollow = true;
+      const line = window.routeEngine.highDenseLine || [];
+      const curPos = truckMarker ? truckMarker.getPosition() : null;
+      const targetPt = curPos ? [curPos.lng, curPos.lat] : (line[0] || [114.059363, 33.564191]);
+      if (line.length >= 2) {
+        const b = turf.bearing(turf.point(line[0]), turf.point(line[1]));
+        currentVehicleHeading = (b + 360) % 360;
+      }
+      map.setPitch(42);
+      map.setRotation(-currentVehicleHeading);
+      map.setZoomAndCenter(15, targetPt);
+      showToast('🔍 已切换至手机导航大比例尺视角 (Zoom=15 · 3D车头朝上 · 展示具体道路与高速名称)', 'success', 3200);
+    });
+  }
+
+  if (btnZoomFitOverview) {
+    btnZoomFitOverview.addEventListener('click', () => {
+      autoFollow = false;
+      map.setPitch(0);
+      map.setRotation(0);
+      if (plannedPolylineLayer) {
+        map.setFitView([plannedPolylineLayer, ...candidateBackupLayers], false, [60, 60, 60, 60]);
+      }
+      showToast('🗺️ 已恢复全程路线总览视角', 'info', 2200);
+    });
+  }
+
+  if (btnMapZoomIn) {
+    btnMapZoomIn.addEventListener('click', () => {
+      const z = Math.min(20, (map.getZoom ? map.getZoom() : 12) + 1.5);
+      map.setZoom(z);
+    });
+  }
+
+  if (btnMapZoomOut) {
+    btnMapZoomOut.addEventListener('click', () => {
+      const z = Math.max(3, (map.getZoom ? map.getZoom() : 12) - 1.5);
+      map.setZoom(z);
     });
   }
 
